@@ -84,8 +84,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # gateway : liste des routes sur /actuator/gateway/routes
+        include: health,info,gateway
   endpoint:
     health:
       probes:
         enabled: true
+    gateway:
+      enabled: true
