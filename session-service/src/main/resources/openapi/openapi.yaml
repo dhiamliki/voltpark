@@ -1,2 +1,834 @@
-# Contrat REST du session-service (API /api/v1).
-# TODO: rediger la specification OpenAPI 3 (ressources, schemas, codes HTTP).
+openapi: 3.0.3
+info:
+  title: VoltPark Session Service API
+  description: >
+    API REST de gestion des conducteurs, stations de recharge, bornes,
+    reservations, sessions de charge et facturation avec tarification avancee (kWh, HP/HC, frais d'occupation).
+  version: 1.0.0
+  contact:
+    name: Equipe VoltPark
+    email: contact@voltpark.tn
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: API Gateway VoltPark
+  - url: http://localhost:8081/api/v1
+    description: Session Service direct
+
+tags:
+  - name: Drivers
+    description: Gestion des conducteurs et badges RFID
+  - name: Stations
+    description: Gestion des stations et grille tarifaire
+  - name: Chargers
+    description: Bornes de recharge (anciennes SOAP et modernes)
+  - name: Reservations
+    description: Reservations de creneaux de charge
+  - name: Sessions
+    description: Demarrage, suivi et cloture des sessions de charge
+  - name: Invoices
+    description: Facturation detaillee des sessions de charge
+
+paths:
+  /drivers:
+    get:
+      tags: [Drivers]
+      summary: Liste tous les conducteurs
+      responses:
+        '200':
+          description: Liste recuperee avec succes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DriverResponse'
+    post:
+      tags: [Drivers]
+      summary: Enregistre un nouveau conducteur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DriverRequest'
+      responses:
+        '201':
+          description: Conducteur cree
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriverResponse'
+        '400':
+          $ref: '#/components/responses/ProblemDetail400'
+
+  /drivers/{id}:
+    get:
+      tags: [Drivers]
+      summary: Recupere un conducteur par identifiant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Conducteur trouve
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriverResponse'
+        '404':
+          $ref: '#/components/responses/ProblemDetail404'
+
+  /stations:
+    get:
+      tags: [Stations]
+      summary: Liste toutes les stations avec leurs bornes
+      responses:
+        '200':
+          description: Liste des stations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StationResponse'
+    post:
+      tags: [Stations]
+      summary: Cree une station de recharge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StationRequest'
+      responses:
+        '201':
+          description: Station creee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StationResponse'
+        '400':
+          $ref: '#/components/responses/ProblemDetail400'
+
+  /stations/{id}:
+    get:
+      tags: [Stations]
+      summary: Recupere une station par son identifiant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Station trouvee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StationResponse'
+        '404':
+          $ref: '#/components/responses/ProblemDetail404'
+
+  /stations/{id}/chargers:
+    get:
+      tags: [Stations]
+      summary: Liste les bornes d'une station
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Bornes de la station
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChargerResponse'
+
+  /chargers:
+    get:
+      tags: [Chargers]
+      summary: Liste toutes les bornes
+      responses:
+        '200':
+          description: Liste des bornes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChargerResponse'
+    post:
+      tags: [Chargers]
+      summary: Enregistre une borne dans une station
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChargerRequest'
+      responses:
+        '201':
+          description: Borne creee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChargerResponse'
+        '400':
+          $ref: '#/components/responses/ProblemDetail400'
+
+  /chargers/{id}:
+    get:
+      tags: [Chargers]
+      summary: Recupere une borne
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Borne trouvee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChargerResponse'
+        '404':
+          $ref: '#/components/responses/ProblemDetail404'
+
+  /chargers/{id}/live-status:
+    get:
+      tags: [Chargers]
+      summary: Interroge le statut en direct de la borne (via passerelle SOAP)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Statut en direct
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chargerId:
+                    type: string
+                  dbStatus:
+                    type: string
+                  liveSoapStatus:
+                    type: string
+
+  /reservations:
+    get:
+      tags: [Reservations]
+      summary: Liste les reservations (filtrable par conducteur ou borne)
+      parameters:
+        - name: driverId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: chargerId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Liste des reservations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReservationResponse'
+    post:
+      tags: [Reservations]
+      summary: Cree une reservation avec detection de conflits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservationRequest'
+      responses:
+        '201':
+          description: Reservation confirmee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+        '400':
+          $ref: '#/components/responses/ProblemDetail400'
+        '409':
+          $ref: '#/components/responses/ProblemDetail409'
+
+  /reservations/{id}:
+    get:
+      tags: [Reservations]
+      summary: Recupere une reservation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Reservation trouvee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+        '404':
+          $ref: '#/components/responses/ProblemDetail404'
+    delete:
+      tags: [Reservations]
+      summary: Annule une reservation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Reservation annulee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+        '404':
+          $ref: '#/components/responses/ProblemDetail404'
+
+  /sessions/start:
+    post:
+      tags: [Sessions]
+      summary: Demarre une session de recharge (appel SOAP RemoteStartTransaction avec Resilience4j)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartSessionRequest'
+      responses:
+        '201':
+          description: Session initiee (ACTIVE ou PENDING_START en cas de fallback)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          $ref: '#/components/responses/ProblemDetail400'
+        '404':
+          $ref: '#/components/responses/ProblemDetail404'
+        '409':
+          $ref: '#/components/responses/ProblemDetail409'
+
+  /sessions:
+    get:
+      tags: [Sessions]
+      summary: Liste les sessions de recharge
+      parameters:
+        - name: driverId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: chargerId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [PENDING_START, ACTIVE, STOPPED, COMPLETED, FAILED]
+      responses:
+        '200':
+          description: Liste des sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SessionResponse'
+
+  /sessions/{id}:
+    get:
+      tags: [Sessions]
+      summary: Recupere une session par son ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session trouvee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '404':
+          $ref: '#/components/responses/ProblemDetail404'
+
+  /sessions/{id}/stop:
+    post:
+      tags: [Sessions]
+      summary: Arrete une session de recharge (appel SOAP RemoteStopTransaction + calcul facture tarification)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StopSessionRequest'
+      responses:
+        '200':
+          description: Session arretee et facture generee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '404':
+          $ref: '#/components/responses/ProblemDetail404'
+        '409':
+          $ref: '#/components/responses/ProblemDetail409'
+
+  /sessions/{id}/invoice:
+    get:
+      tags: [Sessions, Invoices]
+      summary: Recupere la facture associee a une session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Facture de la session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '404':
+          $ref: '#/components/responses/ProblemDetail404'
+
+  /invoices:
+    get:
+      tags: [Invoices]
+      summary: Liste toutes les factures
+      parameters:
+        - name: driverId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Liste des factures
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InvoiceResponse'
+
+  /invoices/{id}:
+    get:
+      tags: [Invoices]
+      summary: Recupere une facture par ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Facture trouvee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '404':
+          $ref: '#/components/responses/ProblemDetail404'
+
+components:
+  responses:
+    ProblemDetail400:
+      description: Requete invalide ou erreur de validation (RFC 7807)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    ProblemDetail404:
+      description: Ressource non trouvee (RFC 7807)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    ProblemDetail409:
+      description: Conflit metier ou d'etat (RFC 7807)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+  schemas:
+    DriverRequest:
+      type: object
+      required: [name, email, badgeId]
+      properties:
+        name:
+          type: string
+          example: "Rafaa Aloui"
+        email:
+          type: string
+          format: email
+          example: "rafaa@voltpark.tn"
+        badgeId:
+          type: string
+          example: "TAG-001"
+        phoneNumber:
+          type: string
+          example: "+216 20 123 456"
+
+    DriverResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: "Rafaa Aloui"
+        email:
+          type: string
+          example: "rafaa@voltpark.tn"
+        badgeId:
+          type: string
+          example: "TAG-001"
+        phoneNumber:
+          type: string
+          example: "+216 20 123 456"
+        createdAt:
+          type: string
+          format: date-time
+
+    StationRequest:
+      type: object
+      required: [name, pricePerKwh, peakPricePerKwh, offPeakPricePerKwh, idleFeePerMinute]
+      properties:
+        name:
+          type: string
+          example: "VoltPark Tunis Centre"
+        address:
+          type: string
+          example: "Avenue Habib Bourguiba, Tunis"
+        latitude:
+          type: number
+          format: double
+          example: 36.8002
+        longitude:
+          type: number
+          format: double
+          example: 10.1865
+        pricePerKwh:
+          type: number
+          format: double
+          example: 0.450
+        peakPricePerKwh:
+          type: number
+          format: double
+          example: 0.550
+        offPeakPricePerKwh:
+          type: number
+          format: double
+          example: 0.350
+        idleFeePerMinute:
+          type: number
+          format: double
+          example: 0.100
+
+    StationResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        address:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        pricePerKwh:
+          type: number
+        peakPricePerKwh:
+          type: number
+        offPeakPricePerKwh:
+          type: number
+        idleFeePerMinute:
+          type: number
+        chargers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChargerResponse'
+
+    ChargerRequest:
+      type: object
+      required: [id, stationId]
+      properties:
+        id:
+          type: string
+          example: "CP-TUN-001"
+        stationId:
+          type: integer
+          format: int64
+          example: 1
+        chargerType:
+          type: string
+          enum: [SOAP, OCPI, STANDARD]
+          example: "SOAP"
+        maxPowerKw:
+          type: number
+          example: 50.0
+
+    ChargerResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "CP-TUN-001"
+        stationId:
+          type: integer
+          format: int64
+        stationName:
+          type: string
+        chargerType:
+          type: string
+        status:
+          type: string
+          enum: [AVAILABLE, OCCUPIED, CHARGING, FAULTED, UNAVAILABLE]
+        maxPowerKw:
+          type: number
+
+    ReservationRequest:
+      type: object
+      required: [driverId, chargerId, startTime, endTime]
+      properties:
+        driverId:
+          type: integer
+          format: int64
+          example: 1
+        chargerId:
+          type: string
+          example: "CP-TUN-001"
+        startTime:
+          type: string
+          format: date-time
+          example: "2026-11-20T20:00:00Z"
+        endTime:
+          type: string
+          format: date-time
+          example: "2026-11-20T21:00:00Z"
+
+    ReservationResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        driverId:
+          type: integer
+          format: int64
+        chargerId:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, ACTIVE, CANCELLED, COMPLETED, EXPIRED]
+        createdAt:
+          type: string
+          format: date-time
+
+    StartSessionRequest:
+      type: object
+      required: [driverId, chargerId]
+      properties:
+        driverId:
+          type: integer
+          format: int64
+          example: 1
+        chargerId:
+          type: string
+          example: "CP-TUN-001"
+        reservationId:
+          type: integer
+          format: int64
+          nullable: true
+        connectorId:
+          type: integer
+          example: 1
+
+    StopSessionRequest:
+      type: object
+      properties:
+        totalEnergyKwh:
+          type: number
+          example: 22.450
+        peakKwh:
+          type: number
+          example: 15.000
+        offPeakKwh:
+          type: number
+          example: 7.450
+        chargeCompletedAt:
+          type: string
+          format: date-time
+
+    SessionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        driverId:
+          type: integer
+          format: int64
+        chargerId:
+          type: string
+        reservationId:
+          type: integer
+          format: int64
+          nullable: true
+        status:
+          type: string
+          enum: [PENDING_START, ACTIVE, STOPPED, COMPLETED, FAILED]
+        transactionId:
+          type: integer
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+        stoppedAt:
+          type: string
+          format: date-time
+          nullable: true
+        chargeCompletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        totalEnergyKwh:
+          type: number
+        peakKwh:
+          type: number
+        offPeakKwh:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+
+    InvoiceResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sessionId:
+          type: string
+        driverId:
+          type: integer
+          format: int64
+        totalEnergyKwh:
+          type: number
+        peakKwh:
+          type: number
+        offPeakKwh:
+          type: number
+        peakEnergyCost:
+          type: number
+        offPeakEnergyCost:
+          type: number
+        energyCost:
+          type: number
+        idleDurationMinutes:
+          type: integer
+          format: int64
+        idleFee:
+          type: number
+        totalAmount:
+          type: number
+        currency:
+          type: string
+          example: "TND"
+        status:
+          type: string
+          enum: [ISSUED, PAID, CANCELLED]
+        issuedAt:
+          type: string
+          format: date-time
+
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        timestamp:
+          type: string
+          format: date-time
+        invalidParams:
+          type: object
+          additionalProperties:
+            type: string
