@@ -11,6 +11,23 @@ grpc:
       address: ${ENERGY_GRPC_ADDRESS:static://localhost:9090}
       negotiation-type: plaintext
 
+simulator:
+  enabled: ${SIMULATOR_ENABLED:true}
+  charger-id: ${SIMULATOR_CHARGER_ID:CP-TUN-001}
+  interval-seconds: ${SIMULATOR_INTERVAL_SECONDS:120}
+  duration-seconds: ${SIMULATOR_DURATION_SECONDS:60}
+  time-factor: ${SIMULATOR_TIME_FACTOR:60}
+
+resilience4j:
+  retry:
+    instances:
+      energyService:
+        max-attempts: 5
+        wait-duration: 2s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exception-predicate: tn.voltpark.simulator.config.RetryableGrpcError
+
 management:
   endpoints:
     web:

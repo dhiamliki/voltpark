@@ -33,6 +33,12 @@
             <artifactId>grpc-server-spring-boot-starter</artifactId>
             <version>${grpc-starter.version}</version>
         </dependency>
+        <!-- Reflection et health check gRPC (utilises par grpcurl) -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-services</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
         <!-- Requis par le code genere par protoc-gen-grpc-java (@javax.annotation.Generated) -->
         <dependency>
             <groupId>javax.annotation</groupId>
@@ -60,6 +66,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

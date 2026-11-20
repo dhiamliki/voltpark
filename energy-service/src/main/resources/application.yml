@@ -16,6 +16,20 @@ server:
 grpc:
   server:
     port: ${GRPC_PORT:9090}
+    # permet a grpcurl de decouvrir les services sans le fichier .proto
+    reflection-service-enabled: true
+
+logging:
+  level:
+    tn.voltpark.energy: ${ENERGY_LOG_LEVEL:INFO}
+
+voltpark:
+  tariff:
+    peak-start: "${PEAK_START:08:00}"
+    peak-end: "${PEAK_END:20:00}"
+    zone: ${TARIFF_ZONE:Africa/Tunis}
+  watch:
+    poll-interval: 1s
 
 management:
   endpoints:

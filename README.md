@@ -125,7 +125,26 @@ Le charger-simulator n'est pas exposé sur l'hôte (healthcheck interne sur le p
 
 - Tests Java : `mvn test` dans le dossier de chaque service (à compléter).
 - Collection Postman : dossier `postman/` (à compléter).
-- Exemples grpcurl : à compléter.
+- Exemples grpcurl : voir « Tests gRPC » ci-dessous.
+
+### Tests gRPC
+
+energy-service a des tests unitaires (calcul heures pleines / creuses, validation, estimation du temps restant) et un test d'intégration qui démarre le serveur gRPC en mémoire avec une base H2. Sans Maven installé :
+
+```bash
+docker run --rm -v "$PWD/energy-service:/app" -w /app maven:3.9-eclipse-temurin-17 mvn -q test
+```
+
+Le dossier `scripts/grpc/` contient des scripts de test manuel (versions `.sh` et `.ps1`). Ils utilisent l'image Docker `fullstorydev/grpcurl` sur le réseau Docker Compose, il faut donc que la stack soit démarrée (`docker compose up -d`). La reflection gRPC est activée, le fichier `.proto` n'est pas nécessaire.
+
+| Script | Rôle |
+|---|---|
+| `list-services` | Liste les services et décrit `EnergyService` |
+| `get-session-energy [session_id]` | Bilan d'une session (par défaut la dernière session du simulateur) |
+| `watch-session [session_id] [durée]` | Suivi en direct d'une session (à lancer pendant une simulation) |
+| `not-found` | Appel sur une session inconnue, réponse attendue `NotFound` |
+
+Exemples : `./scripts/grpc/get-session-energy.sh` ou `.\scripts\grpc\get-session-energy.ps1`.
 
 ## Planning indicatif
 
