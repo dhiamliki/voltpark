@@ -17,6 +17,12 @@ grpc:
   server:
     port: ${GRPC_PORT:9090}
 
+voltpark:
+  tariff:
+    peak-start: "${PEAK_START:08:00}"
+    peak-end: "${PEAK_END:20:00}"
+    zone: ${TARIFF_ZONE:Africa/Tunis}
+
 management:
   endpoints:
     web:
