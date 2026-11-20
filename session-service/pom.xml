@@ -22,6 +22,11 @@
         <springdoc.version>2.6.0</springdoc.version>
         <grpc-starter.version>3.1.0.RELEASE</grpc-starter.version>
         <resilience4j.version>2.2.0</resilience4j.version>
+        <grpc.version>1.63.0</grpc.version>
+        <protobuf.version>3.25.3</protobuf.version>
+        <protobuf-plugin.version>0.6.1</protobuf-plugin.version>
+        <os-plugin.version>1.7.1</os-plugin.version>
+        <javax-annotation.version>1.3.2</javax-annotation.version>
     </properties>
 
     <dependencies>
@@ -60,6 +65,12 @@
             <artifactId>grpc-client-spring-boot-starter</artifactId>
             <version>${grpc-starter.version}</version>
         </dependency>
+        <!-- Requis par le code genere par protoc-gen-grpc-java (@javax.annotation.Generated) -->
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+            <version>${javax-annotation.version}</version>
+        </dependency>
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot3</artifactId>
@@ -78,6 +89,13 @@
     </dependencies>
 
     <build>
+        <extensions>
+            <extension>
+                <groupId>kr.motd.maven</groupId>
+                <artifactId>os-maven-plugin</artifactId>
+                <version>${os-plugin.version}</version>
+            </extension>
+        </extensions>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
@@ -90,6 +108,25 @@
                         </exclude>
                     </excludes>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.xolstice.maven.plugins</groupId>
+                <artifactId>protobuf-maven-plugin</artifactId>
+                <version>${protobuf-plugin.version}</version>
+                <configuration>
+                    <protoSourceRoot>${project.basedir}/src/main/proto</protoSourceRoot>
+                    <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+                    <pluginId>grpc-java</pluginId>
+                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>compile</goal>
+                            <goal>compile-custom</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
