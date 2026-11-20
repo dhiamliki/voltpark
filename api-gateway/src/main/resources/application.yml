@@ -3,21 +3,92 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      # Delais du client HTTP utilise pour appeler les services en aval
+      httpclient:
+        connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:2000}
+        response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:5s}
+      # CORS gere une seule fois ici, pour toutes les routes (le frontend appelle uniquement la gateway)
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          "[/**]":
+            # liste separee par des virgules, par exemple http://localhost:3000,http://localhost:5173
+            allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+            allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+            allowed-headers: "*"
+            exposed-headers: Location,X-Request-Id
+            max-age: 3600
+      default-filters:
+        # si un service en aval ajoute aussi ses propres en-tetes CORS, on n'en garde qu'un
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
       routes:
-        - id: session-service
+        # API REST du session-service
+        - id: session-api
           uri: ${SESSION_SERVICE_URL:http://session-service:8081}
           predicates:
             - Path=/api/v1/**
+          filters:
+            # Si session-service ne repond pas (ou si le circuit est ouvert),
+            # la requete est redirigee vers FallbackController (503 ProblemDetail).
+            - name: CircuitBreaker
+              args:
+                name: sessionService
+                fallbackUri: forward:/fallback/session-service
+            # Nouvel essai uniquement pour GET : une lecture peut etre rejouee sans risque.
+            # POST, PATCH et DELETE ne sont pas idempotents : si la premiere requete a ete
+            # traitee mais que la reponse s'est perdue, la rejouer pourrait par exemple creer
+            # deux reservations ou demarrer deux fois une session.
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                statuses: BAD_GATEWAY,SERVICE_UNAVAILABLE,GATEWAY_TIMEOUT
+                # pas de serie globale : seuls les trois statuts ci-dessus sont rejoues
+                series: ""
+                # erreurs de connexion (session-service arrete ou injoignable)
+                exceptions: java.io.IOException,java.util.concurrent.TimeoutException
+                backoff:
+                  firstBackoff: 100ms
+                  maxBackoff: 1s
+                  factor: 2
+                  basedOnPreviousValue: false
+
+        # Documentation OpenAPI / Swagger UI du session-service, accessible via la gateway
+        - id: session-docs
+          uri: ${SESSION_SERVICE_URL:http://session-service:8081}
+          predicates:
+            - Path=/v3/api-docs/**,/swagger-ui/**,/swagger-ui.html
 
 server:
   port: ${SERVER_PORT:8080}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      sessionService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        # le taux d'echec n'est calcule qu'a partir de 5 appels
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+  timelimiter:
+    instances:
+      sessionService:
+        # meme valeur que le response-timeout du client HTTP
+        timeout-duration: ${GATEWAY_RESPONSE_TIMEOUT:5s}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # gateway : liste des routes sur /actuator/gateway/routes
+        include: health,info,gateway
   endpoint:
     health:
       probes:
         enabled: true
+    gateway:
+      enabled: true
