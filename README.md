@@ -83,6 +83,40 @@ docker compose up --build
 
 Le charger-simulator n'est pas exposé sur l'hôte (healthcheck interne sur le port 8084).
 
+## API Gateway
+
+Le frontend n'appelle que l'api-gateway (port 8080), qui transmet les requêtes à session-service.
+
+**Routes**
+
+| Route | Chemins | Destination |
+|---|---|---|
+| `session-api` | `/api/v1/**` | session-service (`SESSION_SERVICE_URL`) |
+| `session-docs` | `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` | session-service (Swagger UI via la gateway) |
+
+La liste des routes actives est visible sur http://localhost:8080/actuator/gateway/routes. Cet endpoint est en lecture seule : les requêtes qui modifieraient les routes (POST, DELETE) sont refusées avec 405.
+
+**Délais** : connexion `GATEWAY_CONNECT_TIMEOUT_MS` (2000 ms par défaut), réponse `GATEWAY_RESPONSE_TIMEOUT` (5 s par défaut).
+
+**Résilience (route `session-api`)**
+- Retry : uniquement pour les requêtes GET, 2 nouveaux essais sur 502, 503, 504 ou erreur de connexion, avec un délai croissant (100 ms, puis 200 ms, maximum 1 s). POST, PUT, PATCH et DELETE ne sont jamais rejoués : ils ne sont pas idempotents (risque de double réservation, par exemple).
+- Circuit breaker `sessionService` (Resilience4j) : fenêtre de 10 appels, ouverture à 50 % d'échecs (à partir de 5 appels), 10 s en état ouvert avant de retester. Le time limiter utilise la même durée que le délai de réponse.
+- Fallback : si session-service est injoignable ou si le circuit est ouvert, la gateway répond `503` au format RFC 7807 (`application/problem+json`) avec `type`, `title`, `status`, `detail`, `instance` et `timestamp`.
+
+**CORS** : origines autorisées dans `CORS_ALLOWED_ORIGINS` (liste séparée par des virgules, par défaut l'URL du frontend), méthodes GET, POST, PUT, PATCH, DELETE et OPTIONS, en-têtes `Location` et `X-Request-Id` exposés au navigateur, cache du preflight 1 h.
+
+**X-Request-Id** : chaque requête reçoit un identifiant (celui envoyé par le client, sinon un UUID). Il est transmis à session-service, renvoyé dans la réponse et écrit dans le log de la gateway :
+
+```
+GET /api/v1/stations 200 12ms requestId=4281b2a3-dcb2-4818-ab32-806d8e0fcdf5
+```
+
+Tests (sans Maven installé) :
+
+```bash
+docker run --rm -v "$PWD/api-gateway:/app" -w /app maven:3.9-eclipse-temurin-17 mvn -q test
+```
+
 ## Répartition des tâches
 
 ### Rafaa : REST + SOAP
