@@ -13,6 +13,31 @@ spring:
           uri: ${SESSION_SERVICE_URL:http://session-service:8081}
           predicates:
             - Path=/api/v1/**
+          filters:
+            # Si session-service ne repond pas (ou si le circuit est ouvert),
+            # la requete est redirigee vers FallbackController (503 ProblemDetail).
+            - name: CircuitBreaker
+              args:
+                name: sessionService
+                fallbackUri: forward:/fallback/session-service
+            # Nouvel essai uniquement pour GET : une lecture peut etre rejouee sans risque.
+            # POST, PATCH et DELETE ne sont pas idempotents : si la premiere requete a ete
+            # traitee mais que la reponse s'est perdue, la rejouer pourrait par exemple creer
+            # deux reservations ou demarrer deux fois une session.
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                statuses: BAD_GATEWAY,SERVICE_UNAVAILABLE,GATEWAY_TIMEOUT
+                # pas de serie globale : seuls les trois statuts ci-dessus sont rejoues
+                series: ""
+                # erreurs de connexion (session-service arrete ou injoignable)
+                exceptions: java.io.IOException,java.util.concurrent.TimeoutException
+                backoff:
+                  firstBackoff: 100ms
+                  maxBackoff: 1s
+                  factor: 2
+                  basedOnPreviousValue: false
 
         # Documentation OpenAPI / Swagger UI du session-service, accessible via la gateway
         - id: session-docs
@@ -22,6 +47,24 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      sessionService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        # le taux d'echec n'est calcule qu'a partir de 5 appels
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+  timelimiter:
+    instances:
+      sessionService:
+        # meme valeur que le response-timeout du client HTTP
+        timeout-duration: ${GATEWAY_RESPONSE_TIMEOUT:5s}
 
 management:
   endpoints:
