@@ -85,7 +85,7 @@ Le charger-simulator n'est pas exposé sur l'hôte (healthcheck interne sur le p
 
 ## Répartition des tâches
 
-### Membre A - REST + SOAP
+### Rafaa : REST + SOAP
 
 - session-service : entités, repositories, DTOs + validation, contrôleurs sous `/api/v1`, codes HTTP corrects, `@RestControllerAdvice` (ProblemDetail), spécification OpenAPI exportée dans `openapi.yaml`, logique de tarification (kWh x tarif, heures pleines/creuses, frais d'occupation).
 - charger-gateway-service : XSD écrit en premier (contract-first), WSDL généré, opérations `RemoteStartTransaction`, `RemoteStopTransaction`, `GetChargerStatus`, SOAP Faults (borne inconnue, occupée, badge refusé).
@@ -93,7 +93,7 @@ Le charger-simulator n'est pas exposé sur l'hôte (healthcheck interne sur le p
 - Tests : tests unitaires sur la tarification et les réservations, test d'intégration REST (MockMvc) et SOAP.
 - Collection Postman pour les scénarios REST et SOAP.
 
-### Membre B - gRPC + Gateway + Frontend
+### Dhia : gRPC + Gateway + Frontend
 
 - energy-service : `energy.proto` versionné (`voltpark.energy.v1`), RPCs `StreamMeterValues` (client streaming), `WatchSession` (server streaming), `GetSessionEnergy` (unary), codes de statut gRPC adaptés (`NOT_FOUND`, `INVALID_ARGUMENT`, `FAILED_PRECONDITION`), persistance des mesures.
 - Client gRPC dans session-service (package `client/grpc`) avec deadline + fallback Resilience4j, en coordination avec le Membre A.
