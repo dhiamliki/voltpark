@@ -1,8 +1,119 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-    Contrat SOAP du charger-gateway-service (approche contract-first).
-    TODO: definir les types et elements RemoteStartTransaction, RemoteStopTransaction, GetChargerStatus.
--->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="http://voltpark.tn/charger/ws"
+           targetNamespace="http://voltpark.tn/charger/ws"
            elementFormDefault="qualified">
+
+    <!-- Enums -->
+    <xs:simpleType name="RemoteStartStopStatus">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="ACCEPTED"/>
+            <xs:enumeration value="REJECTED"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="ChargerStatus">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="AVAILABLE"/>
+            <xs:enumeration value="OCCUPIED"/>
+            <xs:enumeration value="CHARGING"/>
+            <xs:enumeration value="FAULTED"/>
+            <xs:enumeration value="UNAVAILABLE"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- RemoteStartTransaction -->
+    <xs:element name="RemoteStartTransactionRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="chargerId" type="xs:string"/>
+                <xs:element name="connectorId" type="xs:int" minOccurs="0" default="1"/>
+                <xs:element name="idTag" type="xs:string"/>
+                <xs:element name="reservationId" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="RemoteStartTransactionResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="status" type="tns:RemoteStartStopStatus"/>
+                <xs:element name="transactionId" type="xs:int" minOccurs="0"/>
+                <xs:element name="message" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- RemoteStopTransaction -->
+    <xs:element name="RemoteStopTransactionRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="chargerId" type="xs:string"/>
+                <xs:element name="transactionId" type="xs:int"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="RemoteStopTransactionResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="status" type="tns:RemoteStartStopStatus"/>
+                <xs:element name="message" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- GetChargerStatus -->
+    <xs:element name="GetChargerStatusRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="chargerId" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="GetChargerStatusResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="chargerId" type="xs:string"/>
+                <xs:element name="status" type="tns:ChargerStatus"/>
+                <xs:element name="errorCode" type="xs:string" minOccurs="0"/>
+                <xs:element name="currentTransactionId" type="xs:int" minOccurs="0"/>
+                <xs:element name="timestamp" type="xs:dateTime"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Fault Detail Elements -->
+    <xs:element name="ChargerNotFoundFault">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="errorCode" type="xs:string"/>
+                <xs:element name="message" type="xs:string"/>
+                <xs:element name="chargerId" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="ChargerOccupiedFault">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="errorCode" type="xs:string"/>
+                <xs:element name="message" type="xs:string"/>
+                <xs:element name="chargerId" type="xs:string"/>
+                <xs:element name="currentTransactionId" type="xs:int" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="BadgeRefusedFault">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="errorCode" type="xs:string"/>
+                <xs:element name="message" type="xs:string"/>
+                <xs:element name="idTag" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
 </xs:schema>
