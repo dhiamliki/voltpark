@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: session-service
+  datasource:
+    url: ${SESSION_DB_URL:jdbc:postgresql://localhost:5432/session_db}
+    username: ${SESSION_DB_USER}
+    password: ${SESSION_DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+server:
+  port: ${SERVER_PORT:8081}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+voltpark:
+  clients:
+    charger-gateway:
+      url: ${CHARGER_GATEWAY_URL:http://localhost:8082/ws}
+
+grpc:
+  client:
+    energy-service:
+      address: ${ENERGY_GRPC_ADDRESS:static://localhost:9090}
+      negotiation-type: plaintext

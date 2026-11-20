@@ -1,0 +1,10 @@
+// Contrat gRPC de l'energy-service.
+// TODO: definir les messages et le service (StreamMeterValues, WatchSession, GetSessionEnergy).
+
+syntax = "proto3";
+
+package voltpark.energy.v1;
+
+option java_multiple_files = true;
+option java_package = "tn.voltpark.energy.proto.v1";
+option java_outer_classname = "EnergyProto";

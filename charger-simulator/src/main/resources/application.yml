@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: charger-simulator
+
+server:
+  port: ${SERVER_PORT:8084}
+
+grpc:
+  client:
+    energy-service:
+      address: ${ENERGY_GRPC_ADDRESS:static://localhost:9090}
+      negotiation-type: plaintext
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

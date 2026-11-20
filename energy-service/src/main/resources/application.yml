@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: energy-service
+  datasource:
+    url: ${ENERGY_DB_URL:jdbc:postgresql://localhost:5434/energy_db}
+    username: ${ENERGY_DB_USER}
+    password: ${ENERGY_DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+server:
+  port: ${SERVER_PORT:8083}
+
+grpc:
+  server:
+    port: ${GRPC_PORT:9090}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

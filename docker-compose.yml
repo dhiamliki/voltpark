@@ -1,0 +1,211 @@
+name: voltpark
+
+services:
+
+  # ---------- Bases de donnees ----------
+
+  session-db:
+    image: postgres:16
+    container_name: session-db
+    environment:
+      POSTGRES_DB: ${SESSION_DB_NAME}
+      POSTGRES_USER: ${SESSION_DB_USER}
+      POSTGRES_PASSWORD: ${SESSION_DB_PASSWORD}
+    volumes:
+      - session-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - voltpark-net
+
+  charger-db:
+    image: postgres:16
+    container_name: charger-db
+    environment:
+      POSTGRES_DB: ${CHARGER_DB_NAME}
+      POSTGRES_USER: ${CHARGER_DB_USER}
+      POSTGRES_PASSWORD: ${CHARGER_DB_PASSWORD}
+    volumes:
+      - charger-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - voltpark-net
+
+  energy-db:
+    image: postgres:16
+    container_name: energy-db
+    environment:
+      POSTGRES_DB: ${ENERGY_DB_NAME}
+      POSTGRES_USER: ${ENERGY_DB_USER}
+      POSTGRES_PASSWORD: ${ENERGY_DB_PASSWORD}
+    volumes:
+      - energy-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - voltpark-net
+
+  # ---------- Services ----------
+
+  charger-gateway-service:
+    build: ./charger-gateway-service
+    container_name: charger-gateway-service
+    environment:
+      SERVER_PORT: 8082
+      CHARGER_DB_URL: ${CHARGER_DB_URL}
+      CHARGER_DB_USER: ${CHARGER_DB_USER}
+      CHARGER_DB_PASSWORD: ${CHARGER_DB_PASSWORD}
+    ports:
+      - "8082:8082"
+    depends_on:
+      charger-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - voltpark-net
+
+  energy-service:
+    build: ./energy-service
+    container_name: energy-service
+    environment:
+      SERVER_PORT: 8083
+      GRPC_PORT: 9090
+      ENERGY_DB_URL: ${ENERGY_DB_URL}
+      ENERGY_DB_USER: ${ENERGY_DB_USER}
+      ENERGY_DB_PASSWORD: ${ENERGY_DB_PASSWORD}
+    ports:
+      - "8083:8083"
+      - "9090:9090"
+    depends_on:
+      energy-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - voltpark-net
+
+  session-service:
+    build: ./session-service
+    container_name: session-service
+    environment:
+      SERVER_PORT: 8081
+      SESSION_DB_URL: ${SESSION_DB_URL}
+      SESSION_DB_USER: ${SESSION_DB_USER}
+      SESSION_DB_PASSWORD: ${SESSION_DB_PASSWORD}
+      CHARGER_GATEWAY_URL: ${CHARGER_GATEWAY_URL}
+      ENERGY_GRPC_ADDRESS: ${ENERGY_GRPC_ADDRESS}
+    ports:
+      - "8081:8081"
+    depends_on:
+      session-db:
+        condition: service_healthy
+      charger-gateway-service:
+        condition: service_healthy
+      energy-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - voltpark-net
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    environment:
+      SERVER_PORT: 8080
+      SESSION_SERVICE_URL: ${SESSION_SERVICE_URL}
+    ports:
+      - "8080:8080"
+    depends_on:
+      session-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - voltpark-net
+
+  charger-simulator:
+    build: ./charger-simulator
+    container_name: charger-simulator
+    environment:
+      SERVER_PORT: 8084
+      ENERGY_GRPC_ADDRESS: ${ENERGY_GRPC_ADDRESS}
+    depends_on:
+      energy-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - voltpark-net
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - voltpark-net
+
+  # ---------- Bonus : Kafka (desactive) ----------
+  #
+  # kafka:
+  #   image: apache/kafka:3.7.0
+  #   container_name: kafka
+  #   environment:
+  #     KAFKA_NODE_ID: 1
+  #     KAFKA_PROCESS_ROLES: broker,controller
+  #     KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+  #     KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+  #     KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  #   ports:
+  #     - "9092:9092"
+  #   networks:
+  #     - voltpark-net
+
+volumes:
+  session-db-data:
+  charger-db-data:
+  energy-db-data:
+
+networks:
+  voltpark-net:
+    driver: bridge
