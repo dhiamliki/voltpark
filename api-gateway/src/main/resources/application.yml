@@ -3,11 +3,22 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      # Delais du client HTTP utilise pour appeler les services en aval
+      httpclient:
+        connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:2000}
+        response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:5s}
       routes:
-        - id: session-service
+        # API REST du session-service
+        - id: session-api
           uri: ${SESSION_SERVICE_URL:http://session-service:8081}
           predicates:
             - Path=/api/v1/**
+
+        # Documentation OpenAPI / Swagger UI du session-service, accessible via la gateway
+        - id: session-docs
+          uri: ${SESSION_SERVICE_URL:http://session-service:8081}
+          predicates:
+            - Path=/v3/api-docs/**,/swagger-ui/**,/swagger-ui.html
 
 server:
   port: ${SERVER_PORT:8080}
