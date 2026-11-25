@@ -22,3 +22,10 @@ management:
     health:
       probes:
         enabled: true
+
+voltpark:
+  # simulateur de bornes : previent quand une transaction demarre ou s'arrete
+  simulator:
+    url: ${SIMULATOR_URL:http://charger-simulator:8084}
+    connect-timeout-ms: ${SIMULATOR_CONNECT_TIMEOUT_MS:1000}
+    read-timeout-ms: ${SIMULATOR_READ_TIMEOUT_MS:3000}

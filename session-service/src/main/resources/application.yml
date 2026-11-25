@@ -35,6 +35,12 @@ voltpark:
       url: ${CHARGER_GATEWAY_URL:http://localhost:8082/ws}
       connection-timeout-ms: 3000
       read-timeout-ms: 5000
+    energy:
+      # deadline de chaque appel gRPC vers energy-service
+      deadline-ms: ${ENERGY_GRPC_DEADLINE_MS:2000}
+  live:
+    # duree maximale d'un flux GET /api/v1/sessions/{id}/live (et deadline du WatchSession)
+    timeout-ms: ${SESSION_LIVE_TIMEOUT_MS:900000}
 
 grpc:
   client:
@@ -53,6 +59,17 @@ resilience4j:
         waitDurationInOpenState: 5000ms
         permittedNumberOfCallsInHalfOpenState: 2
         automaticTransitionFromOpenToHalfOpenEnabled: true
+      energyService:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        failureRateThreshold: 50.0
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 1
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        # "pas de mesure" n'est pas une panne d'energy-service
+        ignoreExceptions:
+          - tn.voltpark.session.api.error.EnergyDataNotFoundException
   retry:
     instances:
       chargerGateway:
@@ -60,3 +77,10 @@ resilience4j:
         waitDuration: 500ms
         enableExponentialBackoff: true
         exponentialBackoffMultiplier: 2
+      energyService:
+        maxAttempts: 3
+        waitDuration: 200ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        # uniquement UNAVAILABLE et DEADLINE_EXCEEDED
+        retryExceptionPredicate: tn.voltpark.session.client.grpc.RetryableEnergyError

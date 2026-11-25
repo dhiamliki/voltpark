@@ -65,6 +65,8 @@ services:
       CHARGER_DB_URL: ${CHARGER_DB_URL}
       CHARGER_DB_USER: ${CHARGER_DB_USER}
       CHARGER_DB_PASSWORD: ${CHARGER_DB_PASSWORD}
+      # simulateur de bornes (reseau interne uniquement)
+      SIMULATOR_URL: ${SIMULATOR_URL:-http://charger-simulator:8084}
     ports:
       - "${CHARGER_GATEWAY_HOST_PORT:-8082}:8082"
     depends_on:
@@ -116,6 +118,7 @@ services:
       SESSION_DB_PASSWORD: ${SESSION_DB_PASSWORD}
       CHARGER_GATEWAY_URL: ${CHARGER_GATEWAY_URL}
       ENERGY_GRPC_ADDRESS: ${ENERGY_GRPC_ADDRESS}
+      ENERGY_GRPC_DEADLINE_MS: ${ENERGY_GRPC_DEADLINE_MS:-2000}
     ports:
       - "${SESSION_HOST_PORT:-8081}:8081"
     depends_on:
@@ -163,10 +166,13 @@ services:
     container_name: charger-simulator
     environment:
       SERVER_PORT: 8084
-      SIMULATOR_ENABLED: ${SIMULATOR_ENABLED:-true}
+      # false : seules les sessions demarrees par session-service (via SOAP) envoient des mesures
+      SIMULATOR_ENABLED: ${SIMULATOR_ENABLED:-false}
       SIMULATOR_CHARGER_ID: ${SIMULATOR_CHARGER_ID:-CP-TUN-001}
       SIMULATOR_INTERVAL_SECONDS: ${SIMULATOR_INTERVAL_SECONDS:-120}
       SIMULATOR_DURATION_SECONDS: ${SIMULATOR_DURATION_SECONDS:-60}
+      SIMULATOR_TIME_FACTOR: ${SIMULATOR_TIME_FACTOR:-60}
+      SIMULATOR_MAX_SESSION_SECONDS: ${SIMULATOR_MAX_SESSION_SECONDS:-600}
       ENERGY_GRPC_ADDRESS: ${ENERGY_GRPC_ADDRESS}
     depends_on:
       energy-service:

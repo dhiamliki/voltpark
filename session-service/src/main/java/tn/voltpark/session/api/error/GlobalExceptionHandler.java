@@ -56,6 +56,15 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(EnergyUnavailableException.class)
+    public ProblemDetail handleEnergyUnavailable(EnergyUnavailableException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        problem.setTitle("Service energie indisponible (gRPC)");
+        problem.setType(URI.create("https://voltpark.tn/errors/energy-unavailable"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidationErrors(MethodArgumentNotValidException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Donnees de requete invalides");

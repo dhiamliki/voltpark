@@ -142,7 +142,28 @@ public class Invoice {
         return issuedAt;
     }
 
+    /**
+     * Remplace les montants (recalcul d'une facture PENDING_ENERGY) et emet la facture.
+     */
+    public void applyCalculation(BigDecimal totalEnergyKwh, BigDecimal peakKwh, BigDecimal offPeakKwh,
+                                 BigDecimal peakEnergyCost, BigDecimal offPeakEnergyCost,
+                                 BigDecimal energyCost, Long idleDurationMinutes,
+                                 BigDecimal idleFee, BigDecimal totalAmount) {
+        this.totalEnergyKwh = totalEnergyKwh;
+        this.peakKwh = peakKwh;
+        this.offPeakKwh = offPeakKwh;
+        this.peakEnergyCost = peakEnergyCost;
+        this.offPeakEnergyCost = offPeakEnergyCost;
+        this.energyCost = energyCost;
+        this.idleDurationMinutes = idleDurationMinutes;
+        this.idleFee = idleFee;
+        this.totalAmount = totalAmount;
+        this.status = InvoiceStatus.ISSUED;
+    }
+
     public enum InvoiceStatus {
+        // energie indisponible a l'arret (energy-service injoignable) : montants a recalculer
+        PENDING_ENERGY,
         ISSUED,
         PAID,
         CANCELLED

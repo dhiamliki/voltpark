@@ -11,10 +11,9 @@ import org.springframework.stereotype.Component;
 import tn.voltpark.energy.grpc.v1.EnergyServiceGrpc;
 import tn.voltpark.energy.grpc.v1.MeterValue;
 import tn.voltpark.energy.grpc.v1.StreamSummary;
-import tn.voltpark.simulator.config.SimulatorProperties;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -29,25 +28,23 @@ public class MeterValueStreamer {
     /** Marge ajoutee a la duree de la session pour la deadline de l'appel. */
     private static final int DEADLINE_MARGIN_SECONDS = 15;
 
-    private final SimulatorProperties properties;
-    private final Random random = new Random();
+    /** Une mesure par seconde reelle. */
+    private static final long READING_INTERVAL_MS = 1000;
 
     @GrpcClient("energy-service")
     private EnergyServiceGrpc.EnergyServiceStub energyStub;
 
-    public MeterValueStreamer(SimulatorProperties properties) {
-        this.properties = properties;
-    }
-
     /**
-     * Simule une session complete. En cas d'erreur UNAVAILABLE, Resilience4j relance
-     * la methode avec un delai croissant (voir application.yml), puis appelle skipSession.
+     * Envoie une mesure par seconde jusqu'a la demande d'arret ou jusqu'a maxSeconds,
+     * puis ferme le flux : energy-service cloture alors la session.
+     * En cas d'erreur UNAVAILABLE, Resilience4j relance la methode avec un delai croissant
+     * (voir application.yml), puis appelle skipSession.
      */
     @Retry(name = "energyService", fallbackMethod = "skipSession")
-    public void streamSession(String sessionId) {
+    public void streamSession(SimulatedSession session, int maxSeconds) {
         CompletableFuture<StreamSummary> result = new CompletableFuture<>();
         StreamObserver<MeterValue> requests = energyStub
-                .withDeadlineAfter(properties.durationSeconds() + DEADLINE_MARGIN_SECONDS, TimeUnit.SECONDS)
+                .withDeadlineAfter(maxSeconds + DEADLINE_MARGIN_SECONDS, TimeUnit.SECONDS)
                 .streamMeterValues(new StreamObserver<>() {
                     @Override
                     public void onNext(StreamSummary summary) {
@@ -64,14 +61,13 @@ public class MeterValueStreamer {
                     }
                 });
 
-        ChargingProfile profile = new ChargingProfile(
-                sessionId, properties.chargerId(), properties.timeFactor(), random);
-        log.info("Starting simulated session {} on charger {}", sessionId, properties.chargerId());
+        log.info("Starting simulated session {} on charger {}", session.sessionId(), session.chargerId());
+        Instant end = session.startedAt().plusSeconds(maxSeconds);
 
         try {
-            for (int second = 0; second < properties.durationSeconds() && !result.isDone(); second++) {
-                requests.onNext(profile.next(Instant.now()));
-                Thread.sleep(1000);
+            while (!session.isStopRequested() && !result.isDone() && Instant.now().isBefore(end)) {
+                requests.onNext(session.profile().next(Instant.now()));
+                session.awaitStop(Math.min(READING_INTERVAL_MS, remainingMillis(end)));
             }
             requests.onCompleted();
             StreamSummary summary = result.get(DEADLINE_MARGIN_SECONDS, TimeUnit.SECONDS);
@@ -82,7 +78,7 @@ public class MeterValueStreamer {
             Thread.currentThread().interrupt();
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
-            log.warn("Stream for session {} failed: {}", sessionId, cause.getMessage());
+            log.warn("Stream for session {} failed: {}", session.sessionId(), cause.getMessage());
             if (cause instanceof RuntimeException runtime) {
                 throw runtime;
             }
@@ -92,10 +88,14 @@ public class MeterValueStreamer {
         }
     }
 
+    private static long remainingMillis(Instant end) {
+        return Math.max(0, Duration.between(Instant.now(), end).toMillis());
+    }
+
     /** Appelee quand les essais sont epuises ou que l'erreur n'est pas reessayable. */
     @SuppressWarnings("unused")
-    private void skipSession(String sessionId, Throwable cause) {
+    private void skipSession(SimulatedSession session, int maxSeconds, Throwable cause) {
         String reason = cause instanceof StatusRuntimeException e ? e.getStatus().toString() : cause.toString();
-        log.error("Simulated session {} skipped: {}", sessionId, reason);
+        log.error("Simulated session {} skipped: {}", session.sessionId(), reason);
     }
 }

@@ -21,6 +21,12 @@ public class InvoiceController {
         return sessionService.getInvoice(id);
     }
 
+    /** Recalcule une facture PENDING_ENERGY a partir des mesures d'energy-service. */
+    @PostMapping("/{id}/recalculation")
+    public InvoiceResponse recalculateInvoice(@PathVariable Long id) {
+        return sessionService.recalculateInvoice(id);
+    }
+
     @GetMapping
     public List<InvoiceResponse> getInvoices(@RequestParam(required = false) Long driverId) {
         return sessionService.getInvoices(driverId);

@@ -42,8 +42,11 @@ Flux :
 - Frontend -> api-gateway -> session-service
 - session-service -> charger-gateway-service (SOAP, `WebServiceTemplate`)
 - session-service -> energy-service (gRPC unary `GetSessionEnergy`)
+- charger-gateway-service -> charger-simulator (REST interne `POST/DELETE /api/simulations`, à chaque RemoteStart / RemoteStop accepté)
 - charger-simulator -> energy-service (gRPC client streaming `StreamMeterValues`)
-- frontend / session-service <- energy-service (gRPC server streaming `WatchSession`, exposé via session-service)
+- frontend / session-service <- energy-service (gRPC server streaming `WatchSession`, exposé par session-service en SSE sur `GET /api/v1/sessions/{id}/live`)
+
+Une session porte le même identifiant (UUID créé par session-service) dans les trois services : voir `contracts/README.md`.
 
 Le diagramme d'architecture complet sera ajouté dans `docs/`.
 
@@ -81,7 +84,7 @@ docker compose up --build
 | Health charger-gateway-service | http://localhost:8082/actuator/health |
 | Health energy-service | http://localhost:8083/actuator/health |
 
-Le charger-simulator n'est pas exposé sur l'hôte (healthcheck interne sur le port 8084).
+Le charger-simulator n'est pas exposé sur l'hôte (port 8084 interne : healthcheck et API `/api/simulations` appelée par charger-gateway-service). Par défaut (`SIMULATOR_ENABLED=false`), il n'envoie des mesures que pour les sessions démarrées via session-service ; avec `SIMULATOR_ENABLED=true`, il lance en plus des sessions aléatoires `SIM-...` toutes les `SIMULATOR_INTERVAL_SECONDS` secondes.
 
 ## API Gateway
 
@@ -91,6 +94,7 @@ Le frontend n'appelle que l'api-gateway (port 8080), qui transmet les requêtes 
 
 | Route | Chemins | Destination |
 |---|---|---|
+| `session-live` | `/api/v1/sessions/*/live` | session-service, flux SSE : délai de réponse 1 h, ni retry ni circuit breaker (le time limiter couperait le flux après 5 s), évènements transmis un par un |
 | `session-api` | `/api/v1/**` | session-service (`SESSION_SERVICE_URL`) |
 | `session-docs` | `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` | session-service (Swagger UI via la gateway) |
 
@@ -179,6 +183,48 @@ Le dossier `scripts/grpc/` contient des scripts de test manuel (versions `.sh` e
 | `not-found` | Appel sur une session inconnue, réponse attendue `NotFound` |
 
 Exemples : `./scripts/grpc/get-session-energy.sh` ou `.\scripts\grpc\get-session-energy.ps1`.
+
+## Démonstration
+
+Les scripts de `scripts/demo/` passent uniquement par l'API Gateway (comme le frontend). L'URL est lue dans `GATEWAY_URL`, sinon `http://localhost:<GATEWAY_HOST_PORT du .env>` (8080 par défaut). Il faut que la stack soit démarrée : `docker compose up -d --build --wait`.
+
+### Parcours complet : `full-flow.sh` / `full-flow.ps1`
+
+```bash
+./scripts/demo/full-flow.sh          # suivi en direct de 15 s par défaut
+.\scripts\demo\full-flow.ps1 -LiveSeconds 15
+```
+
+1. choix du conducteur au badge `TAG-002` (badge autorisé par la borne) ;
+2. liste des stations et des bornes ;
+3. réservation de la borne `CP-TUN-001` ;
+4. démarrage de la session : session-service crée la session (UUID) et envoie `RemoteStartTransaction` en SOAP avec cet identifiant ; charger-gateway-service accepte et demande au simulateur de charger ; le simulateur envoie une mesure par seconde à energy-service (gRPC `StreamMeterValues`) ;
+5. suivi en direct pendant 15 s : `GET /api/v1/sessions/{id}/live` (Server-Sent Events, relais de `WatchSession`), une ligne par mesure (puissance, énergie, batterie) ;
+6. arrêt : `RemoteStopTransaction` en SOAP (le simulateur ferme son flux, energy-service clôture la session), puis `GetSessionEnergy` en gRPC ;
+7. facture calculée avec l'énergie réellement mesurée (heures pleines / creuses, frais d'occupation) ;
+8. libération du créneau réservé.
+
+Variables possibles : `DEMO_BADGE`, `DEMO_CHARGER`.
+
+### Pannes : `failure.sh` / `failure.ps1`
+
+```bash
+./scripts/demo/failure.sh
+.\scripts\demo\failure.ps1
+```
+
+- **A. Passerelle SOAP arrêtée** : le script arrête `charger-gateway-service` puis démarre une session. Le client SOAP de session-service (timeouts, retry, circuit breaker Resilience4j) échoue et le fallback crée la session en `PENDING_START` (réponse 201). Le service est ensuite redémarré et la session en attente est clôturée.
+- **B. energy-service arrêté à l'arrêt d'une session** : une session est démarrée normalement, puis `energy-service` est arrêté. L'arrêt de la session réussit quand même (200) : le client gRPC fait de nouveaux essais (UNAVAILABLE), le circuit `energyService` s'ouvre et la facture est créée avec le statut `PENDING_ENERGY` (montant 0). Un recalcul pendant la panne (`POST /api/v1/invoices/{id}/recalculation`) répond 503. Après le redémarrage d'energy-service, le recalcul répond 200 et la facture passe en `ISSUED` avec l'énergie mesurée avant la panne.
+
+Les scripts utilisent `docker stop` / `docker start` : ils doivent être lancés sur la machine qui exécute la stack.
+
+**Base existante** : Hibernate a créé une contrainte `CHECK` sur `invoices.status` avec les anciennes valeurs, et `ddl-auto: update` ne la met pas à jour. Sur une base créée avant l'ajout du statut `PENDING_ENERGY`, la supprimer une fois :
+
+```bash
+docker exec session-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;"'
+```
+
+(ou repartir d'une base vide avec `docker compose down -v`, ce qui efface toutes les données).
 
 ## Planning indicatif
 

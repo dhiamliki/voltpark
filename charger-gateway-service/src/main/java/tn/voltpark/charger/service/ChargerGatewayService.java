@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tn.voltpark.charger.client.SimulatorClient;
 import tn.voltpark.charger.model.AuthorizedBadge;
 import tn.voltpark.charger.model.ChargerStation;
 import tn.voltpark.charger.repository.AuthorizedBadgeRepository;
@@ -21,12 +22,15 @@ public class ChargerGatewayService {
     private static final Logger log = LoggerFactory.getLogger(ChargerGatewayService.class);
     private final ChargerStationRepository chargerRepository;
     private final AuthorizedBadgeRepository badgeRepository;
+    private final SimulatorClient simulatorClient;
     private final AtomicInteger transactionSequence = new AtomicInteger(1000);
 
     public ChargerGatewayService(ChargerStationRepository chargerRepository,
-                                 AuthorizedBadgeRepository badgeRepository) {
+                                 AuthorizedBadgeRepository badgeRepository,
+                                 SimulatorClient simulatorClient) {
         this.chargerRepository = chargerRepository;
         this.badgeRepository = badgeRepository;
+        this.simulatorClient = simulatorClient;
     }
 
     @Transactional
@@ -57,8 +61,14 @@ public class ChargerGatewayService {
         charger.setStatus(ChargerStatus.CHARGING);
         charger.setCurrentTransactionId(txId);
         charger.setCurrentIdTag(request.getIdTag());
+        charger.setCurrentSessionId(request.getSessionId());
         charger.setUpdatedAt(Instant.now());
         chargerRepository.save(charger);
+
+        // la borne (simulee) commence a envoyer ses mesures pour cette session
+        if (request.getSessionId() != null && !request.getSessionId().isBlank()) {
+            simulatorClient.startSimulation(request.getSessionId(), charger.getChargerId());
+        }
 
         RemoteStartTransactionResponse response = new RemoteStartTransactionResponse();
         response.setStatus(RemoteStartStopStatus.ACCEPTED);
@@ -75,11 +85,17 @@ public class ChargerGatewayService {
         ChargerStation charger = chargerRepository.findByChargerId(request.getChargerId())
                 .orElseThrow(() -> new ChargerNotFoundException(request.getChargerId()));
 
+        String sessionId = charger.getCurrentSessionId();
         charger.setStatus(ChargerStatus.AVAILABLE);
         charger.setCurrentTransactionId(null);
         charger.setCurrentIdTag(null);
+        charger.setCurrentSessionId(null);
         charger.setUpdatedAt(Instant.now());
         chargerRepository.save(charger);
+
+        if (sessionId != null) {
+            simulatorClient.stopSimulation(sessionId);
+        }
 
         RemoteStopTransactionResponse response = new RemoteStopTransactionResponse();
         response.setStatus(RemoteStartStopStatus.ACCEPTED);

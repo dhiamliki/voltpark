@@ -22,9 +22,10 @@ function Invoke-Grpcurl {
     docker run --rm --network $Network fullstorydev/grpcurl:v1.9.1 -plaintext @options @GrpcurlArgs
 }
 
-# Derniere session creee par le simulateur (lue dans ses logs).
+# Derniere session demarree par le simulateur (lue dans ses logs) : session planifiee
+# (SIM-<horodatage>) ou session reelle demarree via session-service (UUID).
 function Get-LatestSimSession {
-    $ids = docker logs charger-simulator 2>&1 | Select-String -Pattern 'SIM-\d+' -AllMatches |
-        ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }
+    $ids = docker logs charger-simulator 2>&1 | Select-String -Pattern 'Starting simulated session (\S+) on charger' |
+        ForEach-Object { $_.Matches[0].Groups[1].Value }
     if ($ids) { @($ids)[-1] }
 }
