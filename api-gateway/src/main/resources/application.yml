@@ -22,6 +22,18 @@ spring:
         # si un service en aval ajoute aussi ses propres en-tetes CORS, on n'en garde qu'un
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
       routes:
+        # Suivi en direct d'une session (Server-Sent Events). Flux long : il ne passe ni par le
+        # circuit breaker (son time limiter couperait le flux apres 5 s) ni par le retry, et il a
+        # son propre delai de reponse (1 h, en ms) a la place des 5 s globaux.
+        # Les reponses text/event-stream sont transmises evenement par evenement, sans mise en tampon.
+        - id: session-live
+          uri: ${SESSION_SERVICE_URL:http://session-service:8081}
+          order: -1
+          predicates:
+            - Path=/api/v1/sessions/*/live
+          metadata:
+            response-timeout: 3600000
+
         # API REST du session-service
         - id: session-api
           uri: ${SESSION_SERVICE_URL:http://session-service:8081}
