@@ -49,6 +49,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- Validation du corps des requetes de l'API /api/simulations -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
         <!-- Retry avec backoff exponentiel si energy-service est indisponible -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>

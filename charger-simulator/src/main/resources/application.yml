@@ -17,6 +17,7 @@ simulator:
   interval-seconds: ${SIMULATOR_INTERVAL_SECONDS:120}
   duration-seconds: ${SIMULATOR_DURATION_SECONDS:60}
   time-factor: ${SIMULATOR_TIME_FACTOR:60}
+  max-session-seconds: ${SIMULATOR_MAX_SESSION_SECONDS:600}
 
 resilience4j:
   retry:
