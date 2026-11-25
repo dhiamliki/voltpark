@@ -1,18 +1,20 @@
 package tn.voltpark.session.api.controller;
 
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tn.voltpark.session.api.dto.InvoiceResponse;
 import tn.voltpark.session.api.dto.SessionResponse;
 import tn.voltpark.session.api.dto.StartSessionRequest;
 import tn.voltpark.session.api.dto.StopSessionRequest;
 import tn.voltpark.session.domain.model.ChargingSession;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tn.voltpark.session.domain.service.SessionLiveService;
 import tn.voltpark.session.domain.service.SessionManagementService;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -27,22 +29,22 @@ public class SessionController {
         this.sessionLiveService = sessionLiveService;
     }
 
-    @PostMapping("/start")
-    @ResponseStatus(HttpStatus.CREATED)
-    public SessionResponse startSession(@Valid @RequestBody StartSessionRequest request) {
-        return sessionService.startSession(request);
-    }
-
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public SessionResponse startSessionDirect(@Valid @RequestBody StartSessionRequest request) {
-        return sessionService.startSession(request);
+    public ResponseEntity<SessionResponse> startSession(@Valid @RequestBody StartSessionRequest request) {
+        SessionResponse session = sessionService.startSession(request);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}").buildAndExpand(session.id()).toUri();
+        return ResponseEntity.created(location).body(session);
     }
 
-    @PostMapping("/{id}/stop")
-    public SessionResponse stopSession(
+    /**
+     * Mise a jour partielle de la session. Seule transition acceptee : {"status":"STOPPED"}
+     * (arret de la charge, puis facturation ; la session passe a COMPLETED).
+     */
+    @PatchMapping("/{id}")
+    public SessionResponse updateSession(
             @PathVariable String id,
-            @RequestBody(required = false) StopSessionRequest request) {
+            @Valid @RequestBody StopSessionRequest request) {
         return sessionService.stopSession(id, request);
     }
 

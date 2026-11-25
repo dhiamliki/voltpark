@@ -1,14 +1,16 @@
 package tn.voltpark.session.api.controller;
 
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tn.voltpark.session.api.dto.ChargerRequest;
 import tn.voltpark.session.api.dto.ChargerResponse;
 import tn.voltpark.session.client.soap.ChargerSoapClient;
 import tn.voltpark.session.domain.model.Charger;
 import tn.voltpark.session.domain.service.StationService;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -25,9 +27,11 @@ public class ChargerController {
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ChargerResponse createCharger(@Valid @RequestBody ChargerRequest request) {
-        return stationService.createCharger(request);
+    public ResponseEntity<ChargerResponse> createCharger(@Valid @RequestBody ChargerRequest request) {
+        ChargerResponse created = stationService.createCharger(request);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}").buildAndExpand(created.id()).toUri();
+        return ResponseEntity.created(location).body(created);
     }
 
     @GetMapping("/{id}")

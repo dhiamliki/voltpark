@@ -99,11 +99,17 @@ public class SessionManagementService {
 
     @Transactional
     public SessionResponse stopSession(String sessionId, StopSessionRequest request) {
+        // PATCH /sessions/{id} : seule la transition vers STOPPED est autorisee (400 sinon)
+        if (request == null || request.status() != ChargingSession.SessionStatus.STOPPED) {
+            throw new IllegalArgumentException("Seule la mise a jour {\"status\":\"STOPPED\"} est acceptee");
+        }
+
         ChargingSession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session de charge", sessionId));
 
         if (session.getStatus() == ChargingSession.SessionStatus.COMPLETED ||
-                session.getStatus() == ChargingSession.SessionStatus.STOPPED) {
+                session.getStatus() == ChargingSession.SessionStatus.STOPPED ||
+                session.getStatus() == ChargingSession.SessionStatus.FAILED) {
             throw new InvalidSessionStateException("La session " + sessionId + " est deja cloturee");
         }
 

@@ -12,6 +12,8 @@ spring:
 
 server:
   port: ${SERVER_PORT:8081}
+  # en-tetes X-Forwarded-* de l'api-gateway : les en-tetes Location pointent vers la gateway
+  forward-headers-strategy: framework
 
 management:
   endpoints:

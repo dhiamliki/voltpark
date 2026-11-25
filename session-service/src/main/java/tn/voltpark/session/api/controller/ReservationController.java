@@ -1,12 +1,14 @@
 package tn.voltpark.session.api.controller;
 
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tn.voltpark.session.api.dto.ReservationRequest;
 import tn.voltpark.session.api.dto.ReservationResponse;
 import tn.voltpark.session.domain.service.ReservationService;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -20,9 +22,11 @@ public class ReservationController {
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ReservationResponse createReservation(@Valid @RequestBody ReservationRequest request) {
-        return reservationService.createReservation(request);
+    public ResponseEntity<ReservationResponse> createReservation(@Valid @RequestBody ReservationRequest request) {
+        ReservationResponse created = reservationService.createReservation(request);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}").buildAndExpand(created.id()).toUri();
+        return ResponseEntity.created(location).body(created);
     }
 
     @GetMapping("/{id}")
@@ -37,8 +41,10 @@ public class ReservationController {
         return reservationService.getReservations(driverId, chargerId);
     }
 
+    /** Annule la reservation (statut CANCELLED) : 204 sans corps. */
     @DeleteMapping("/{id}")
-    public ReservationResponse cancelReservation(@PathVariable Long id) {
-        return reservationService.cancelReservation(id);
+    public ResponseEntity<Void> cancelReservation(@PathVariable Long id) {
+        reservationService.cancelReservation(id);
+        return ResponseEntity.noContent().build();
     }
 }
