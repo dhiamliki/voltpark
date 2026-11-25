@@ -486,6 +486,31 @@ paths:
         '404':
           $ref: '#/components/responses/ProblemDetail404'
 
+  /invoices/{id}/recalculation:
+    post:
+      tags: [Invoices]
+      summary: Recalcule une facture PENDING_ENERGY a partir des mesures d'energy-service
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Facture recalculee (statut ISSUED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '404':
+          $ref: '#/components/responses/ProblemDetail404'
+        '409':
+          description: La facture n'est pas en attente de mesures
+        '503':
+          description: energy-service toujours indisponible
+
 components:
   responses:
     ProblemDetail400:
@@ -805,7 +830,8 @@ components:
           example: "TND"
         status:
           type: string
-          enum: [ISSUED, PAID, CANCELLED]
+          description: PENDING_ENERGY si energy-service etait indisponible a l'arret (montants a recalculer)
+          enum: [PENDING_ENERGY, ISSUED, PAID, CANCELLED]
         issuedAt:
           type: string
           format: date-time

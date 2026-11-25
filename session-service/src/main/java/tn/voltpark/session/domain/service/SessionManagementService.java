@@ -9,6 +9,8 @@ import tn.voltpark.session.api.dto.InvoiceResponse;
 import tn.voltpark.session.api.dto.SessionResponse;
 import tn.voltpark.session.api.dto.StartSessionRequest;
 import tn.voltpark.session.api.dto.StopSessionRequest;
+import tn.voltpark.session.api.error.EnergyDataNotFoundException;
+import tn.voltpark.session.api.error.EnergyUnavailableException;
 import tn.voltpark.session.api.error.InvalidSessionStateException;
 import tn.voltpark.session.api.error.ResourceNotFoundException;
 import tn.voltpark.session.client.grpc.EnergyGrpcClient;
@@ -122,9 +124,19 @@ public class SessionManagementService {
         BigDecimal totalEnergy = BigDecimal.ZERO;
         BigDecimal peakKwh = BigDecimal.ZERO;
         BigDecimal offPeakKwh = BigDecimal.ZERO;
+        // energy-service injoignable : facture creee en PENDING_ENERGY, a recalculer plus tard
+        boolean energyPending = false;
 
-        SessionEnergy energyProto = energyGrpcClient.getSessionEnergy(sessionId);
-        if (energyProto != null && energyProto.getTotalEnergyKwh() > 0) {
+        SessionEnergy energyProto = null;
+        boolean noReadings = false;
+        try {
+            energyProto = energyGrpcClient.getSessionEnergy(sessionId);
+        } catch (EnergyDataNotFoundException e) {
+            // la borne n'a envoye aucune mesure pour cette session
+            noReadings = true;
+        }
+
+        if (energyProto != null) {
             totalEnergy = BigDecimal.valueOf(energyProto.getTotalEnergyKwh());
             peakKwh = BigDecimal.valueOf(energyProto.getPeakKwh());
             offPeakKwh = BigDecimal.valueOf(energyProto.getOffPeakKwh());
@@ -134,11 +146,11 @@ public class SessionManagementService {
             totalEnergy = request.totalEnergyKwh();
             peakKwh = request.peakKwh() != null ? request.peakKwh() : BigDecimal.ZERO;
             offPeakKwh = request.offPeakKwh() != null ? request.offPeakKwh() : BigDecimal.ZERO;
+        } else if (noReadings) {
+            log.warn("No meter values for session {}: invoicing 0 kWh", sessionId);
         } else {
-            // Mesures par defaut si simulation non connectee
-            totalEnergy = BigDecimal.valueOf(18.500);
-            peakKwh = BigDecimal.valueOf(12.000);
-            offPeakKwh = BigDecimal.valueOf(6.500);
+            energyPending = true;
+            log.warn("Energy unavailable for session {}: invoice left PENDING_ENERGY", sessionId);
         }
 
         Instant stoppedAt = Instant.now();
@@ -174,12 +186,57 @@ public class SessionManagementService {
                     calc.totalAmount(),
                     "TND"
             );
+            if (energyPending) {
+                invoice.setStatus(Invoice.InvoiceStatus.PENDING_ENERGY);
+            }
             invoiceRepository.save(invoice);
-            log.info("Invoice created for session {}: totalAmount={} TND (energy={}, idleFee={})",
-                    sessionId, calc.totalAmount(), calc.energyCost(), calc.idleFee());
+            log.info("Invoice created for session {}: status={}, totalAmount={} TND (energy={}, idleFee={})",
+                    sessionId, invoice.getStatus(), calc.totalAmount(), calc.energyCost(), calc.idleFee());
         }
 
         return toSessionResponse(savedSession);
+    }
+
+    /**
+     * Recalcule une facture PENDING_ENERGY quand energy-service est de nouveau joignable.
+     */
+    @Transactional
+    public InvoiceResponse recalculateInvoice(Long invoiceId) {
+        Invoice invoice = invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Facture", invoiceId));
+        if (invoice.getStatus() != Invoice.InvoiceStatus.PENDING_ENERGY) {
+            throw new InvalidSessionStateException("La facture " + invoiceId + " n'est pas en attente de mesures");
+        }
+        ChargingSession session = sessionRepository.findById(invoice.getSessionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Session de charge", invoice.getSessionId()));
+        Station station = chargerRepository.findById(session.getChargerId())
+                .map(Charger::getStation)
+                .orElseThrow(() -> new ResourceNotFoundException("Borne", session.getChargerId()));
+
+        // NOT_FOUND -> EnergyDataNotFoundException (404)
+        SessionEnergy energy = energyGrpcClient.getSessionEnergy(session.getId());
+        if (energy == null) {
+            throw new EnergyUnavailableException("energy-service indisponible, reessayer plus tard");
+        }
+
+        BigDecimal totalEnergy = BigDecimal.valueOf(energy.getTotalEnergyKwh());
+        BigDecimal peakKwh = BigDecimal.valueOf(energy.getPeakKwh());
+        BigDecimal offPeakKwh = BigDecimal.valueOf(energy.getOffPeakKwh());
+        TariffCalculationService.CalculationResult calc = tariffCalculationService.calculateInvoice(
+                station, totalEnergy, peakKwh, offPeakKwh, session.getChargeCompletedAt(), session.getStoppedAt());
+
+        session.setTotalEnergyKwh(totalEnergy);
+        session.setPeakKwh(peakKwh);
+        session.setOffPeakKwh(offPeakKwh);
+        sessionRepository.save(session);
+
+        invoice.applyCalculation(calc.totalEnergyKwh(), calc.peakKwh(), calc.offPeakKwh(),
+                calc.peakEnergyCost(), calc.offPeakEnergyCost(), calc.energyCost(),
+                calc.idleDurationMinutes(), calc.idleFee(), calc.totalAmount());
+        Invoice saved = invoiceRepository.save(invoice);
+        log.info("Invoice {} recalculated for session {}: totalAmount={} TND",
+                invoiceId, session.getId(), calc.totalAmount());
+        return toInvoiceResponse(saved);
     }
 
     @Transactional(readOnly = true)
