@@ -142,6 +142,11 @@ public class Invoice {
         return issuedAt;
     }
 
+    /** Date d'emission (donnees de demonstration : factures passees). */
+    public void setIssuedAt(Instant issuedAt) {
+        this.issuedAt = issuedAt;
+    }
+
     /**
      * Remplace les montants (recalcul d'une facture PENDING_ENERGY) et emet la facture.
      */
