@@ -89,6 +89,7 @@
   color: var(--on-primary-muted);
   font-size: var(--text-md);
   font-weight: 500;
+  white-space: nowrap;
   text-decoration: none;
   text-align: left;
   cursor: pointer;
