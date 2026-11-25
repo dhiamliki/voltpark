@@ -141,6 +141,46 @@ Tests (sans Maven installé) :
 docker run --rm -v "$PWD/api-gateway:/app" -w /app maven:3.9-eclipse-temurin-17 mvn -q test
 ```
 
+## Frontend
+
+Application web du conducteur (`frontend/`) : React 19, TypeScript, Vite, React Router, carte Leaflet (react-leaflet) et icônes lucide-react. Elle n'appelle que l'API Gateway.
+
+![Carte et session en direct](docs/screenshots/carte.png)
+
+**Pages**
+
+| Page | Rôle |
+|---|---|
+| Carte (`/`) | Carte OpenStreetMap avec une épingle par station (épingle sélectionnée en vert sauge) et sa bulle « Nom · X disponibles », bouton de localisation, fiche de la station (bornes totales, disponibles, occupées, liste des bornes, « Réserver une borne ») et, en dessous, la session en cours. Le champ « Rechercher une station… » filtre les stations. |
+| Réservations | Choix de la station, de la borne et du créneau ; les erreurs de validation de l'API s'affichent sous chaque champ. Liste des réservations à venir avec « Démarrer la charge » (`POST /sessions`) et « Annuler » (`DELETE`, 204). |
+| Mes sessions | Session en direct : anneau de batterie et temps restant, puissance, énergie, durée, « Arrêter la charge » (`PATCH /sessions/{id}` `{"status":"STOPPED"}`, puis ouverture de la facture) et graphique de puissance des 120 dernières mesures. Session `PENDING_START` : « Réessayer le démarrage » (`POST /sessions/{id}/start-attempts`) ou « Annuler ». Historique paginé avec lien vers chaque facture. |
+| Factures | Liste et détail (kWh heures pleines / creuses, prix, frais d'occupation, total). Facture `PENDING_ENERGY` : « Recalculer ». |
+| Paramètres (Profil sur mobile) | Choix ou création du conducteur. Il n'y a pas encore d'authentification : le conducteur choisi est retenu dans le navigateur (localStorage). |
+
+Sur téléphone (moins de 768 px), la barre latérale est remplacée par un en-tête (logo et menu) et une barre d'onglets en bas : Carte, Sessions, Factures, Profil.
+
+**Suivi en direct.** La page ouvre un `EventSource` sur `GET /api/v1/sessions/{id}/live`. session-service relaie le flux gRPC `WatchSession` d'energy-service en Server-Sent Events : un évènement `progress` par mesure (puissance, énergie, batterie, temps restant), `end` quand la session est clôturée. Chaque mesure met à jour l'anneau, les chiffres et le graphique (composant SVG maison, sans bibliothèque de graphiques). Quitter la page ferme la connexion, ce qui annule l'appel gRPC côté serveur.
+
+**Erreurs.** Toutes les requêtes passent par un seul client (`src/api/client.ts`). Une réponse d'erreur au format ProblemDetail (RFC 7807) devient un message en français : erreurs de validation champ par champ, refus de la borne (`BADGE_REFUSED` → « Badge refusé par la borne. », `CHARGER_OCCUPIED`), messages de nos services, ou message générique selon le statut. Les bandeaux affichent aussi le début de l'en-tête `X-Request-Id` (« Réf. … ») pour retrouver la requête dans les logs.
+
+**Thème.** Toutes les couleurs, rayons, ombres et tailles de texte sont des variables CSS dans `src/styles/theme.css` (fond gris chaud, barre latérale presque noire, accent vert sauge, vert et rouge réservés aux vrais statuts). Les autres feuilles de style n'utilisent que ces variables. Police Inter installée avec le projet (`@fontsource/inter`, pas de CDN).
+
+**Lancer en développement**
+
+```bash
+cd frontend
+npm ci
+VITE_API_BASE_URL=http://localhost:8080/api/v1 npm run dev     # http://localhost:5173
+```
+
+`VITE_API_BASE_URL` est l'URL de la gateway vue par le navigateur ; elle est figée au moment du build (image Docker : argument `VITE_API_BASE_URL`, par défaut `http://localhost:<GATEWAY_HOST_PORT>/api/v1`). Pour `npm run dev`, l'origine `http://localhost:5173` doit être dans `CORS_ALLOWED_ORIGINS` (c'est le cas dans `.env.example`).
+
+**Autres commandes** : `npm test` (Vitest + Testing Library), `npm run build`, `npm run gen:api` (régénère `src/api/schema.d.ts` à partir de `openapi.yaml` de session-service avec openapi-typescript ; le générateur a besoin de l'API de TypeScript 5, il est donc lancé avec `npx` dans un environnement séparé, le projet restant en TypeScript 7).
+
+**Fonds de carte.** Les tuiles viennent des serveurs OpenStreetMap (attribution affichée en bas de la carte) et demandent un accès à Internet ; les noms de lieux sont ceux d'OpenStreetMap (en arabe et en français à Tunis). Sans accès aux tuiles, la page affiche à la place la liste des stations.
+
+**Captures d'écran** (`docs/screenshots/`) : `carte.png`, `reservation.png`, `session-live.png`, `facture.png`, `pending-start.png`, `mobile.png`, `mobile-session.png`.
+
 ## Répartition des tâches
 
 ### Rafaa : REST + SOAP
