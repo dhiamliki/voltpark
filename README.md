@@ -1,5 +1,7 @@
 # VoltPark
 
+[![CI](https://github.com/dhiamliki/voltpark/actions/workflows/ci.yml/badge.svg)](https://github.com/dhiamliki/voltpark/actions/workflows/ci.yml)
+
 VoltPark est une plateforme de gestion d'un réseau de bornes de recharge pour véhicules électriques.
 Les conducteurs recherchent une station, réservent une borne, démarrent et arrêtent une session de charge, puis reçoivent une facture.
 Une partie du parc est composée d'anciennes bornes qui ne parlent qu'un protocole SOAP historique (inspiré d'OCPP 1.5) : une passerelle dédiée fait le lien avec ces bornes.
@@ -238,6 +240,18 @@ Variables possibles : `DEMO_BADGE`, `DEMO_CHARGER`.
 Les scripts utilisent `docker stop` / `docker start` : ils doivent être lancés sur la machine qui exécute la stack.
 
 **Base existante** : Hibernate crée des contraintes `CHECK` sur les colonnes de statut, et `ddl-auto: update` ne les met pas à jour quand un statut est ajouté (`PENDING_ENERGY`, `CANCELLED`). Après une mise à jour, repartir de bases vides : `docker compose down -v` (efface toutes les données, les données de démonstration sont recréées au démarrage).
+
+## Intégration continue
+
+Le pipeline GitHub Actions (`.github/workflows/ci.yml`) se lance à chaque push sur `main` et à chaque pull request vers `main`. Un nouveau push sur la même branche annule le pipeline encore en cours. Le pipeline n'a que le droit de lire le dépôt.
+
+| Job | Rôle |
+|---|---|
+| `java` | Une exécution par service Java (session-service, charger-gateway-service, energy-service, api-gateway, charger-simulator), en parallèle : `mvn -B -ntp verify` (compilation, tests unitaires et d'intégration, packaging) avec Java 17 Temurin et le cache Maven. Un service en échec n'arrête pas les autres ; ses rapports de tests (surefire) sont alors disponibles en artefact. |
+| `frontend` | Node 22 : `npm ci` puis `npm run build` (vérification TypeScript et build Vite). |
+| `compose` | Lancé seulement si les deux jobs précédents réussissent. Il crée `.env` à partir de `.env.example`, construit les images, démarre toute la stack (`docker compose up -d --wait`), puis exécute `scripts/demo/full-flow.sh` via la gateway (port 8080) comme test de bout en bout : la session doit démarrer, envoyer des mesures, s'arrêter et être facturée, sans erreur 5xx. En cas d'échec, les logs des conteneurs sont affichés ; la stack est toujours arrêtée et les volumes supprimés à la fin. |
+
+Le badge en haut de ce README indique l'état du dernier pipeline sur `main`.
 
 ## Planning indicatif
 
