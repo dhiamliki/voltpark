@@ -32,6 +32,11 @@ field() {
     tr ',{' '\n\n' | sed -n "s/^ *\"$1\": *\"\{0,1\}\([^\"}]*\)\"\{0,1\}.*/\1/p" | head -n 1
 }
 
+# Message "detail" d'une erreur ProblemDetail (peut contenir des virgules).
+detail() {
+    sed -n 's/.*"detail":"\([^"]*\)".*/\1/p'
+}
+
 # Date ISO-8601 (UTC) dans N secondes.
 iso_in() {
     date -u -d "+$1 seconds" +%Y-%m-%dT%H:%M:%SZ

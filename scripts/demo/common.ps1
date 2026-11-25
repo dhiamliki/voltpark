@@ -31,6 +31,11 @@ function Invoke-Api {
         if ($null -eq $_.Exception.Response) { throw }
         $code = [int]$_.Exception.Response.StatusCode
         $content = $_.ErrorDetails.Message
+        if (-not $content -and $_.Exception.Response -is [System.Net.HttpWebResponse]) {
+            # Windows PowerShell 5.1 : le corps de l'erreur est dans le flux de la reponse
+            $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+            $content = $reader.ReadToEnd()
+        }
     }
     Write-Info "$Method $Path -> HTTP $code"
     $json = $null

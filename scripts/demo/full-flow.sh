@@ -32,7 +32,7 @@ if [ "$CODE" = "201" ]; then
     info "reservation id=$RESERVATION_ID, statut $(echo "$BODY" | field status)"
     RESERVATION_JSON=",\"reservationId\":$RESERVATION_ID"
 else
-    info "reservation refusee ($(echo "$BODY" | field detail)) : on continue sans reservation"
+    info "reservation refusee ($(echo "$BODY" | detail)) : on continue sans reservation"
     RESERVATION_JSON=""
 fi
 

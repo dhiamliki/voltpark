@@ -64,7 +64,7 @@ info "facture id=$INVOICE_ID, statut $(echo "$BODY" | field status), total $(ech
 
 step "B4. Recalcul pendant la panne : attendu 503"
 call POST "/invoices/$INVOICE_ID/recalculation"
-info "$(echo "$BODY" | field detail)"
+info "$(echo "$BODY" | detail)"
 
 step "B5. Redemarrage d'energy-service"
 docker start energy-service >/dev/null
