@@ -1,6 +1,7 @@
 package tn.voltpark.session.api.controller;
 
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -27,6 +28,7 @@ public class ChargerController {
     }
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED) // documente le 201 dans /v3/api-docs
     public ResponseEntity<ChargerResponse> createCharger(@Valid @RequestBody ChargerRequest request) {
         ChargerResponse created = stationService.createCharger(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()

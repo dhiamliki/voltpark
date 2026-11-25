@@ -79,6 +79,20 @@ class GatewayRoutingTest {
     }
 
     @Test
+    void sendsForwardedHeadersSoLocationPointsToTheGateway() throws InterruptedException {
+        sessionService.enqueue(new MockResponse().setBody("pong"));
+
+        client.get().uri("/api/v1/ping").exchange().expectStatus().isOk();
+
+        RecordedRequest forwarded = sessionService.takeRequest(1, TimeUnit.SECONDS);
+        assertThat(forwarded).isNotNull();
+        // adresse de la gateway telle que le client l'a appelee
+        assertThat(forwarded.getHeader("X-Forwarded-Host")).startsWith("localhost");
+        assertThat(forwarded.getHeader("X-Forwarded-Proto")).isEqualTo("http");
+        assertThat(forwarded.getHeader("X-Forwarded-Port")).isNotBlank();
+    }
+
+    @Test
     void keepsIncomingRequestId() throws InterruptedException {
         sessionService.enqueue(new MockResponse().setBody("pong"));
 

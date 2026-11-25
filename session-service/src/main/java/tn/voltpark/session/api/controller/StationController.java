@@ -1,6 +1,7 @@
 package tn.voltpark.session.api.controller;
 
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -23,6 +24,7 @@ public class StationController {
     }
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED) // documente le 201 dans /v3/api-docs
     public ResponseEntity<StationResponse> createStation(@Valid @RequestBody StationRequest request) {
         StationResponse created = stationService.createStation(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()

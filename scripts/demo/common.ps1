@@ -23,10 +23,12 @@ function Invoke-Api {
     param([string]$Method, [string]$Path, $Body)
     $params = @{ Method = $Method; Uri = "$Api$Path"; UseBasicParsing = $true; ContentType = "application/json" }
     if ($null -ne $Body) { $params.Body = ($Body | ConvertTo-Json -Compress) }
+    $location = $null
     try {
         $response = Invoke-WebRequest @params
         $code = [int]$response.StatusCode
         $content = $response.Content
+        $location = $response.Headers["Location"]
     } catch {
         if ($null -eq $_.Exception.Response) { throw }
         $code = [int]$_.Exception.Response.StatusCode
@@ -37,10 +39,16 @@ function Invoke-Api {
             $content = $reader.ReadToEnd()
         }
     }
-    Write-Info "$Method $Path -> HTTP $code"
+    if ($location) { Write-Info "$Method $Path -> HTTP $code (Location: $location)" }
+    else { Write-Info "$Method $Path -> HTTP $code" }
     $json = $null
     if ($content) { try { $json = $content | ConvertFrom-Json } catch { } }
-    [pscustomobject]@{ Code = $code; Json = $json }
+    [pscustomobject]@{ Code = $code; Json = $json; Location = $location }
+}
+
+# Arret d'une session : PATCH /sessions/{id} {"status":"STOPPED"}
+function Stop-Session([string]$SessionId) {
+    Invoke-Api PATCH "/sessions/$SessionId" @{ status = "STOPPED" }
 }
 
 # Date ISO-8601 (UTC) dans N secondes.

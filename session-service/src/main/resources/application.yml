@@ -36,7 +36,8 @@ voltpark:
     charger-gateway:
       url: ${CHARGER_GATEWAY_URL:http://localhost:8082/ws}
       connection-timeout-ms: 3000
-      read-timeout-ms: 5000
+      # 3 s : avec les nouveaux essais, la reponse reste sous le delai de 10 s de l'api-gateway
+      read-timeout-ms: 3000
     energy:
       # deadline de chaque appel gRPC vers energy-service
       deadline-ms: ${ENERGY_GRPC_DEADLINE_MS:2000}

@@ -1,6 +1,7 @@
 package tn.voltpark.session.api.controller;
 
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +31,7 @@ public class SessionController {
     }
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED) // documente le 201 dans /v3/api-docs
     public ResponseEntity<SessionResponse> startSession(@Valid @RequestBody StartSessionRequest request) {
         SessionResponse session = sessionService.startSession(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()

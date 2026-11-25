@@ -14,17 +14,28 @@ info() { printf '    %s\n' "$*"; }
 fail() { printf '    ERREUR : %s\n' "$*" >&2; exit 1; }
 
 # Requete HTTP vers la gateway : call METHODE CHEMIN [JSON]
-# Affiche le code HTTP ; le code est dans $CODE et le corps de la reponse dans $BODY.
+# Affiche le code HTTP ; le code est dans $CODE, le corps dans $BODY et l'en-tete Location dans $LOCATION.
 call() {
     tmp=$(mktemp)
+    hdr=$(mktemp)
     if [ -n "$3" ]; then
-        CODE=$(curl -s -o "$tmp" -w '%{http_code}' -X "$1" "$API$2" -H 'Content-Type: application/json' -d "$3")
+        CODE=$(curl -s -D "$hdr" -o "$tmp" -w '%{http_code}' -X "$1" "$API$2" -H 'Content-Type: application/json' -d "$3")
     else
-        CODE=$(curl -s -o "$tmp" -w '%{http_code}' -X "$1" "$API$2")
+        CODE=$(curl -s -D "$hdr" -o "$tmp" -w '%{http_code}' -X "$1" "$API$2")
     fi
     BODY=$(cat "$tmp")
-    rm -f "$tmp"
-    info "$1 $2 -> HTTP $CODE"
+    LOCATION=$(tr -d '\r' < "$hdr" | sed -n 's/^[Ll]ocation: *//p')
+    rm -f "$tmp" "$hdr"
+    if [ -n "$LOCATION" ]; then
+        info "$1 $2 -> HTTP $CODE (Location: $LOCATION)"
+    else
+        info "$1 $2 -> HTTP $CODE"
+    fi
+}
+
+# Arret d'une session : PATCH /sessions/{id} {"status":"STOPPED"}
+stop_session() {
+    call PATCH "/sessions/$1" '{"status":"STOPPED"}'
 }
 
 # Valeur du premier champ JSON de ce nom : echo "$BODY" | field id

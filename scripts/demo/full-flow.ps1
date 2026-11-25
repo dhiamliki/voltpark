@@ -19,7 +19,7 @@ Write-Step "2. Stations et bornes"
 foreach ($s in (Invoke-Api GET "/stations").Json) { Write-Info "station $($s.id) : $($s.name)" }
 foreach ($c in (Invoke-Api GET "/chargers").Json) { Write-Info "borne $($c.id) : $($c.status)" }
 
-Write-Step "3. Reservation de la borne $Charger"
+Write-Step "3. Reservation de la borne $Charger (POST /reservations : 201 + Location)"
 $r = Invoke-Api POST "/reservations" @{ driverId = $DriverId; chargerId = $Charger; startTime = (Get-IsoIn 5); endTime = (Get-IsoIn 1800) }
 $ReservationId = $null
 $start = @{ driverId = $DriverId; chargerId = $Charger }
@@ -31,19 +31,20 @@ if ($r.Code -eq 201) {
     Write-Info "reservation refusee ($($r.Json.detail)) : on continue sans reservation"
 }
 
-Write-Step "4. Demarrage de la session (session-service -> SOAP RemoteStartTransaction -> borne)"
+Write-Step "4. Demarrage de la session (POST /sessions -> SOAP RemoteStartTransaction -> borne)"
 $r = Invoke-Api POST "/sessions" $start
 if ($r.Code -ne 201) { Stop-Demo "demarrage refuse : $($r.Json.detail)" }
 $SessionId = $r.Json.id
 Write-Info "session id=$SessionId"
 Write-Info "statut $($r.Json.status), transaction borne $($r.Json.transactionId)"
+if ($ReservationId) { Write-Info "reservation : statut $((Invoke-Api GET "/reservations/$ReservationId").Json.status)" }
 
 Write-Step "5. Suivi en direct pendant $LiveSeconds s (GET /sessions/{id}/live, relais du flux gRPC WatchSession)"
 Start-Sleep -Seconds 2
 Watch-Live $SessionId $LiveSeconds
 
-Write-Step "6. Arret de la session (SOAP RemoteStopTransaction, puis GetSessionEnergy en gRPC)"
-$r = Invoke-Api POST "/sessions/$SessionId/stop"
+Write-Step "6. Arret : PATCH /sessions/{id} {`"status`":`"STOPPED`"} (SOAP RemoteStopTransaction, puis GetSessionEnergy en gRPC)"
+$r = Stop-Session $SessionId
 Write-Info "statut $($r.Json.status), energie $($r.Json.totalEnergyKwh) kWh"
 
 Write-Step "7. Facture"
@@ -54,8 +55,8 @@ Write-Info "cout HP $($i.peakEnergyCost) + HC $($i.offPeakEnergyCost) + occupati
 Write-Info "TOTAL : $($i.totalAmount) $($i.currency)"
 
 if ($ReservationId) {
-    Write-Step "8. Liberation du creneau reserve (sinon il reste reserve pour la prochaine demonstration)"
-    Invoke-Api DELETE "/reservations/$ReservationId" | Out-Null
+    Write-Step "8. Reservation terminee avec la session (le creneau est libere)"
+    Write-Info "reservation : statut $((Invoke-Api GET "/reservations/$ReservationId").Json.status)"
 }
 
 Write-Step "Termine"

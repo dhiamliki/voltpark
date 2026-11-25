@@ -1,6 +1,7 @@
 package tn.voltpark.session.api.controller;
 
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -22,6 +23,7 @@ public class ReservationController {
     }
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED) // documente le 201 dans /v3/api-docs
     public ResponseEntity<ReservationResponse> createReservation(@Valid @RequestBody ReservationRequest request) {
         ReservationResponse created = reservationService.createReservation(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -43,6 +45,7 @@ public class ReservationController {
 
     /** Annule la reservation (statut CANCELLED) : 204 sans corps. */
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public ResponseEntity<Void> cancelReservation(@PathVariable Long id) {
         reservationService.cancelReservation(id);
         return ResponseEntity.noContent().build();
