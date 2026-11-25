@@ -38,6 +38,9 @@ voltpark:
     energy:
       # deadline de chaque appel gRPC vers energy-service
       deadline-ms: ${ENERGY_GRPC_DEADLINE_MS:2000}
+  live:
+    # duree maximale d'un flux GET /api/v1/sessions/{id}/live (et deadline du WatchSession)
+    timeout-ms: ${SESSION_LIVE_TIMEOUT_MS:900000}
 
 grpc:
   client:

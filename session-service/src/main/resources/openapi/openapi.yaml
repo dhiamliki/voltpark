@@ -424,6 +424,31 @@ paths:
         '409':
           $ref: '#/components/responses/ProblemDetail409'
 
+  /sessions/{id}/live:
+    get:
+      tags: [Sessions]
+      summary: Suivi en direct de la session (Server-Sent Events)
+      description: >
+        Relaie le flux gRPC WatchSession d'energy-service. Evenements : "progress"
+        (LiveProgress, a chaque mesure), "end" (session cloturee, fin du flux),
+        "error" (aucune mesure ou energy-service indisponible, fin du flux).
+        L'appel gRPC est annule quand le client se deconnecte.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Flux d'evenements
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/LiveProgress'
+        '404':
+          $ref: '#/components/responses/ProblemDetail404'
+
   /sessions/{id}/invoice:
     get:
       tags: [Sessions, Invoices]
@@ -752,6 +777,24 @@ components:
         chargeCompletedAt:
           type: string
           format: date-time
+
+    LiveProgress:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        powerKw:
+          type: number
+        energyKwh:
+          type: number
+        socPercent:
+          type: integer
+        estimatedMinutesRemaining:
+          type: integer
+          description: -1 si l'estimation est impossible
 
     SessionResponse:
       type: object
