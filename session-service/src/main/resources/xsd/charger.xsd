@@ -86,8 +86,11 @@
         </xs:complexType>
     </xs:element>
 
-    <!-- Fault Detail Elements -->
-    <xs:element name="ChargerNotFoundFault">
+    <!-- Details des SOAP Faults.
+         Les noms finissent par "Detail" et non par "Fault" : DefaultWsdl11Definition cree un message
+         WSDL (et une operation) pour chaque element finissant par Request, Response ou Fault.
+         Avec "Fault", ces elements apparaissaient comme de fausses operations dans le WSDL. -->
+    <xs:element name="ChargerNotFoundDetail">
         <xs:complexType>
             <xs:sequence>
                 <xs:element name="errorCode" type="xs:string"/>
@@ -97,7 +100,7 @@
         </xs:complexType>
     </xs:element>
 
-    <xs:element name="ChargerOccupiedFault">
+    <xs:element name="ChargerOccupiedDetail">
         <xs:complexType>
             <xs:sequence>
                 <xs:element name="errorCode" type="xs:string"/>
@@ -108,12 +111,25 @@
         </xs:complexType>
     </xs:element>
 
-    <xs:element name="BadgeRefusedFault">
+    <xs:element name="BadgeRefusedDetail">
         <xs:complexType>
             <xs:sequence>
                 <xs:element name="errorCode" type="xs:string"/>
                 <xs:element name="message" type="xs:string"/>
                 <xs:element name="idTag" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- RemoteStopTransaction avec un transactionId different de la transaction en cours -->
+    <xs:element name="InvalidTransactionDetail">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="errorCode" type="xs:string"/>
+                <xs:element name="message" type="xs:string"/>
+                <xs:element name="chargerId" type="xs:string"/>
+                <xs:element name="transactionId" type="xs:int"/>
+                <xs:element name="currentTransactionId" type="xs:int" minOccurs="0"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>

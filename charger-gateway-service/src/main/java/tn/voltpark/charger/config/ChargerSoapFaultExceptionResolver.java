@@ -11,9 +11,11 @@ import org.springframework.ws.soap.server.endpoint.SoapFaultDefinition;
 import tn.voltpark.charger.service.BadgeRefusedException;
 import tn.voltpark.charger.service.ChargerNotFoundException;
 import tn.voltpark.charger.service.ChargerOccupiedException;
-import tn.voltpark.charger.ws.BadgeRefusedFault;
-import tn.voltpark.charger.ws.ChargerNotFoundFault;
-import tn.voltpark.charger.ws.ChargerOccupiedFault;
+import tn.voltpark.charger.service.InvalidTransactionException;
+import tn.voltpark.charger.ws.BadgeRefusedDetail;
+import tn.voltpark.charger.ws.ChargerNotFoundDetail;
+import tn.voltpark.charger.ws.ChargerOccupiedDetail;
+import tn.voltpark.charger.ws.InvalidTransactionDetail;
 import tn.voltpark.charger.ws.ObjectFactory;
 
 public class ChargerSoapFaultExceptionResolver extends AbstractSoapFaultDefinitionExceptionResolver {
@@ -25,9 +27,10 @@ public class ChargerSoapFaultExceptionResolver extends AbstractSoapFaultDefiniti
     public ChargerSoapFaultExceptionResolver() {
         try {
             this.jaxbContext = JAXBContext.newInstance(
-                    ChargerNotFoundFault.class,
-                    ChargerOccupiedFault.class,
-                    BadgeRefusedFault.class
+                    ChargerNotFoundDetail.class,
+                    ChargerOccupiedDetail.class,
+                    BadgeRefusedDetail.class,
+                    InvalidTransactionDetail.class
             );
         } catch (Exception e) {
             throw new IllegalStateException("Failed to initialize JAXBContext for SOAP Faults", e);
@@ -36,7 +39,8 @@ public class ChargerSoapFaultExceptionResolver extends AbstractSoapFaultDefiniti
 
     @Override
     protected SoapFaultDefinition getFaultDefinition(Object endpoint, Exception ex) {
-        if (ex instanceof ChargerNotFoundException || ex instanceof ChargerOccupiedException || ex instanceof BadgeRefusedException) {
+        if (ex instanceof ChargerNotFoundException || ex instanceof ChargerOccupiedException
+                || ex instanceof BadgeRefusedException || ex instanceof InvalidTransactionException) {
             SoapFaultDefinition faultDefinition = new SoapFaultDefinition();
             faultDefinition.setFaultCode(SoapFaultDefinition.CLIENT);
             faultDefinition.setFaultStringOrReason(ex.getMessage());
@@ -51,23 +55,31 @@ public class ChargerSoapFaultExceptionResolver extends AbstractSoapFaultDefiniti
         try {
             Marshaller marshaller = jaxbContext.createMarshaller();
             if (ex instanceof ChargerNotFoundException notFound) {
-                ChargerNotFoundFault faultObj = objectFactory.createChargerNotFoundFault();
+                ChargerNotFoundDetail faultObj = objectFactory.createChargerNotFoundDetail();
                 faultObj.setErrorCode("CHARGER_NOT_FOUND");
                 faultObj.setMessage(notFound.getMessage());
                 faultObj.setChargerId(notFound.getChargerId());
                 marshaller.marshal(faultObj, detail.getResult());
             } else if (ex instanceof ChargerOccupiedException occupied) {
-                ChargerOccupiedFault faultObj = objectFactory.createChargerOccupiedFault();
+                ChargerOccupiedDetail faultObj = objectFactory.createChargerOccupiedDetail();
                 faultObj.setErrorCode("CHARGER_OCCUPIED");
                 faultObj.setMessage(occupied.getMessage());
                 faultObj.setChargerId(occupied.getChargerId());
                 faultObj.setCurrentTransactionId(occupied.getCurrentTransactionId());
                 marshaller.marshal(faultObj, detail.getResult());
             } else if (ex instanceof BadgeRefusedException badgeRefused) {
-                BadgeRefusedFault faultObj = objectFactory.createBadgeRefusedFault();
+                BadgeRefusedDetail faultObj = objectFactory.createBadgeRefusedDetail();
                 faultObj.setErrorCode("BADGE_REFUSED");
                 faultObj.setMessage(badgeRefused.getMessage());
                 faultObj.setIdTag(badgeRefused.getIdTag());
+                marshaller.marshal(faultObj, detail.getResult());
+            } else if (ex instanceof InvalidTransactionException invalid) {
+                InvalidTransactionDetail faultObj = objectFactory.createInvalidTransactionDetail();
+                faultObj.setErrorCode("TRANSACTION_MISMATCH");
+                faultObj.setMessage(invalid.getMessage());
+                faultObj.setChargerId(invalid.getChargerId());
+                faultObj.setTransactionId(invalid.getTransactionId());
+                faultObj.setCurrentTransactionId(invalid.getCurrentTransactionId());
                 marshaller.marshal(faultObj, detail.getResult());
             }
         } catch (Exception e) {
