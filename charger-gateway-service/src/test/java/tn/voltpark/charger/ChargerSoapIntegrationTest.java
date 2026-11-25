@@ -77,8 +77,8 @@ public class ChargerSoapIntegrationTest {
 
         client.sendRequest(withPayload(new StringSource(request)))
                 .andExpect(clientOrSenderFault())
-                .andExpect(xpath("//ns2:ChargerNotFoundFault/ns2:errorCode", namespaces()).evaluatesTo("CHARGER_NOT_FOUND"))
-                .andExpect(xpath("//ns2:ChargerNotFoundFault/ns2:chargerId", namespaces()).evaluatesTo("CP-UNKNOWN"));
+                .andExpect(xpath("//ns2:ChargerNotFoundDetail/ns2:errorCode", namespaces()).evaluatesTo("CHARGER_NOT_FOUND"))
+                .andExpect(xpath("//ns2:ChargerNotFoundDetail/ns2:chargerId", namespaces()).evaluatesTo("CP-UNKNOWN"));
     }
 
     @Test
@@ -93,8 +93,8 @@ public class ChargerSoapIntegrationTest {
 
         client.sendRequest(withPayload(new StringSource(request)))
                 .andExpect(clientOrSenderFault())
-                .andExpect(xpath("//ns2:ChargerOccupiedFault/ns2:errorCode", namespaces()).evaluatesTo("CHARGER_OCCUPIED"))
-                .andExpect(xpath("//ns2:ChargerOccupiedFault/ns2:chargerId", namespaces()).evaluatesTo("CP-TUN-OCCUPIED"));
+                .andExpect(xpath("//ns2:ChargerOccupiedDetail/ns2:errorCode", namespaces()).evaluatesTo("CHARGER_OCCUPIED"))
+                .andExpect(xpath("//ns2:ChargerOccupiedDetail/ns2:chargerId", namespaces()).evaluatesTo("CP-TUN-OCCUPIED"));
     }
 
     @Test
@@ -109,8 +109,8 @@ public class ChargerSoapIntegrationTest {
 
         client.sendRequest(withPayload(new StringSource(request)))
                 .andExpect(clientOrSenderFault())
-                .andExpect(xpath("//ns2:BadgeRefusedFault/ns2:errorCode", namespaces()).evaluatesTo("BADGE_REFUSED"))
-                .andExpect(xpath("//ns2:BadgeRefusedFault/ns2:idTag", namespaces()).evaluatesTo("TAG-BLOCKED"));
+                .andExpect(xpath("//ns2:BadgeRefusedDetail/ns2:errorCode", namespaces()).evaluatesTo("BADGE_REFUSED"))
+                .andExpect(xpath("//ns2:BadgeRefusedDetail/ns2:idTag", namespaces()).evaluatesTo("TAG-BLOCKED"));
     }
 
     @Test
