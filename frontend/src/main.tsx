@@ -1,10 +1,24 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
+import { BrowserRouter } from 'react-router'
+import '@fontsource/inter/400.css'
+import '@fontsource/inter/500.css'
+import '@fontsource/inter/600.css'
+import 'leaflet/dist/leaflet.css'
+import './styles/theme.css'
+import './styles/app.css'
+import { App } from './App'
+import { DriverProvider } from './state/DriverContext'
+import { SearchProvider } from './state/SearchContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <BrowserRouter>
+      <DriverProvider>
+        <SearchProvider>
+          <App />
+        </SearchProvider>
+      </DriverProvider>
+    </BrowserRouter>
   </StrictMode>,
 )

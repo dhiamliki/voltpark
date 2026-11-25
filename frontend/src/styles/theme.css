@@ -1,0 +1,156 @@
+/*
+ * Theme VoltPark : toutes les couleurs, rayons, ombres et la typographie sont ici.
+ * Les autres feuilles de style n'utilisent que ces variables (aucune couleur en dur).
+ */
+:root {
+  /* Couleurs de base */
+  --bg: #f4f4f2;
+  --surface: #fafaf8;
+  --surface-strong: #ffffff;
+  --primary: #202321;
+  --on-primary: #ffffff;
+  --accent: #718875;
+  --secondary: #a7aaa5;
+  --text: #202321;
+  --text-muted: #6b6e6a;
+
+  /* Statuts reels uniquement (disponible, occupe, erreur, badge refuse) */
+  --success: #5e8c5a;
+  --danger: #b5493e;
+
+  /* Nuances derivees des couleurs de base */
+  --border: rgba(32, 35, 33, 0.08);
+  --border-strong: rgba(32, 35, 33, 0.16);
+  --sunken: rgba(32, 35, 33, 0.045);
+  --accent-tint: rgba(113, 136, 117, 0.16);
+  --accent-tint-soft: rgba(113, 136, 117, 0.08);
+  --success-tint: rgba(94, 140, 90, 0.12);
+  --danger-tint: rgba(181, 73, 62, 0.08);
+  --danger-border: rgba(181, 73, 62, 0.22);
+  --primary-raised: #2e322f;
+  --primary-hover: #343835;
+  --on-primary-muted: rgba(255, 255, 255, 0.66);
+  --on-primary-border: rgba(255, 255, 255, 0.1);
+  --overlay: rgba(32, 35, 33, 0.32);
+  --skeleton: rgba(32, 35, 33, 0.06);
+  --skeleton-shine: rgba(255, 255, 255, 0.55);
+
+  /* Formes */
+  --radius-card: 16px;
+  --radius-control: 12px;
+  --radius-pill: 999px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 4px 16px rgba(32, 35, 33, 0.08);
+
+  /* Espacements */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Typographie */
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+  --text-number: 30px;
+
+  --sidebar-width: 232px;
+  --topbar-height: 72px;
+  --tabbar-height: 64px;
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--text-md);
+  line-height: 1.45;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.number {
+  font-size: var(--text-number);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
