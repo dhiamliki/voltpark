@@ -61,6 +61,9 @@ resilience4j:
         waitDurationInOpenState: 5000ms
         permittedNumberOfCallsInHalfOpenState: 2
         automaticTransitionFromOpenToHalfOpenEnabled: true
+        # SOAP Fault metier (refus de la borne) : pas une panne, ne compte pas comme echec
+        ignoreExceptions:
+          - tn.voltpark.session.api.error.ChargerFaultException
       energyService:
         slidingWindowType: COUNT_BASED
         slidingWindowSize: 5
@@ -75,10 +78,15 @@ resilience4j:
   retry:
     instances:
       chargerGateway:
+        # 3 essais : 300 ms puis 600 ms d'attente entre eux
         maxAttempts: 3
-        waitDuration: 500ms
+        waitDuration: 300ms
         enableExponentialBackoff: true
         exponentialBackoffMultiplier: 2
+        # jamais de nouvel essai pour un refus de la borne ni quand le circuit est ouvert
+        ignoreExceptions:
+          - tn.voltpark.session.api.error.ChargerFaultException
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
       energyService:
         maxAttempts: 3
         waitDuration: 200ms

@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.ws.client.core.WebServiceTemplate;
+import org.springframework.ws.soap.client.SoapFaultClientException;
+import tn.voltpark.session.api.error.ChargerFaultException;
 import tn.voltpark.session.client.soap.model.*;
 
 @Service
@@ -26,8 +28,22 @@ public class ChargerSoapClient {
             boolean fallbackTriggered
     ) {}
 
-    @CircuitBreaker(name = "chargerGateway", fallbackMethod = "fallbackRemoteStart")
-    @Retry(name = "chargerGateway")
+    /**
+     * RemoteStartTransaction avec Resilience4j.
+     *
+     * Ordre des aspects : Resilience4j place Retry a l'exterieur et CircuitBreaker a l'interieur,
+     * soit Retry( CircuitBreaker( appel SOAP ) ). Le fallbackMethod est donc sur @Retry :
+     * le fallback ne s'execute qu'apres tous les essais (avec backoff). Place sur @CircuitBreaker,
+     * il renverrait un resultat des le premier echec et Retry ne referait jamais l'appel.
+     *
+     * - panne (connexion refusee, timeout, HTTP 5xx, faute Server) : nouvel essai, puis fallback
+     *   PENDING_START ;
+     * - circuit ouvert (CallNotPermittedException) : pas de nouvel essai, fallback immediat ;
+     * - SOAP Fault metier (borne inconnue, occupee, badge refuse) : ChargerFaultException,
+     *   ignoree par Retry et CircuitBreaker (voir application.yml) et relancee par le fallback.
+     */
+    @Retry(name = "chargerGateway", fallbackMethod = "fallbackRemoteStart")
+    @CircuitBreaker(name = "chargerGateway")
     public RemoteStartResult remoteStartTransaction(String chargerId, int connectorId, String idTag, String reservationId, String sessionId) {
         log.info("Sending SOAP RemoteStartTransaction to charger: chargerId={}, idTag={}", chargerId, idTag);
 
@@ -38,7 +54,17 @@ public class ChargerSoapClient {
         request.setReservationId(reservationId);
         request.setSessionId(sessionId);
 
-        RemoteStartTransactionResponse response = (RemoteStartTransactionResponse) webServiceTemplate.marshalSendAndReceive(request);
+        RemoteStartTransactionResponse response;
+        try {
+            response = (RemoteStartTransactionResponse) webServiceTemplate.marshalSendAndReceive(request);
+        } catch (SoapFaultClientException e) {
+            ChargerFaultException business = ChargerFaultMapper.toBusinessException(e);
+            if (business == null) {
+                throw e; // faute Server : panne de la passerelle
+            }
+            log.warn("Charger {} refused the start: {} ({})", chargerId, business.getMessage(), business.getErrorCode());
+            throw business;
+        }
 
         if (response != null && response.getStatus() == RemoteStartStopStatus.ACCEPTED) {
             log.info("Charger accepted transaction: txId={}", response.getTransactionId());
@@ -51,6 +77,10 @@ public class ChargerSoapClient {
     }
 
     public RemoteStartResult fallbackRemoteStart(String chargerId, int connectorId, String idTag, String reservationId, String sessionId, Throwable t) {
+        if (t instanceof ChargerFaultException business) {
+            // reponse metier de la borne, pas une panne : pas de PENDING_START
+            throw business;
+        }
         log.warn("Charger gateway SOAP communication failed for charger {} (circuit breaker / retry fallback active): {}",
                 chargerId, t.getMessage());
         return new RemoteStartResult(

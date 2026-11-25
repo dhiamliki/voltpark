@@ -11,6 +11,8 @@ import tn.voltpark.session.api.dto.StartSessionRequest;
 import tn.voltpark.session.api.dto.StopSessionRequest;
 import tn.voltpark.session.api.error.EnergyDataNotFoundException;
 import tn.voltpark.session.api.error.EnergyUnavailableException;
+import tn.voltpark.session.api.error.ChargerCommunicationException;
+import tn.voltpark.session.api.error.ChargerFaultException;
 import tn.voltpark.session.api.error.InvalidSessionStateException;
 import tn.voltpark.session.api.error.ResourceNotFoundException;
 import tn.voltpark.session.client.grpc.EnergyGrpcClient;
@@ -20,6 +22,7 @@ import tn.voltpark.session.repository.ChargerRepository;
 import tn.voltpark.session.repository.ChargingSessionRepository;
 import tn.voltpark.session.repository.DriverRepository;
 import tn.voltpark.session.repository.InvoiceRepository;
+import tn.voltpark.session.repository.ReservationRepository;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -34,6 +37,7 @@ public class SessionManagementService {
     private final InvoiceRepository invoiceRepository;
     private final DriverRepository driverRepository;
     private final ChargerRepository chargerRepository;
+    private final ReservationRepository reservationRepository;
     private final ChargerSoapClient chargerSoapClient;
     private final EnergyGrpcClient energyGrpcClient;
     private final TariffCalculationService tariffCalculationService;
@@ -42,6 +46,7 @@ public class SessionManagementService {
                                     InvoiceRepository invoiceRepository,
                                     DriverRepository driverRepository,
                                     ChargerRepository chargerRepository,
+                                    ReservationRepository reservationRepository,
                                     ChargerSoapClient chargerSoapClient,
                                     EnergyGrpcClient energyGrpcClient,
                                     TariffCalculationService tariffCalculationService) {
@@ -49,11 +54,20 @@ public class SessionManagementService {
         this.invoiceRepository = invoiceRepository;
         this.driverRepository = driverRepository;
         this.chargerRepository = chargerRepository;
+        this.reservationRepository = reservationRepository;
         this.chargerSoapClient = chargerSoapClient;
         this.energyGrpcClient = energyGrpcClient;
         this.tariffCalculationService = tariffCalculationService;
     }
 
+    /**
+     * Demarre une session : appel SOAP RemoteStartTransaction.
+     * - borne d'accord : session ACTIVE, borne CHARGING, reservation ACTIVE ;
+     * - passerelle injoignable (fallback) : session PENDING_START, borne OCCUPIED (gardee pour
+     *   cette session), a relancer avec POST /sessions/{id}/start-attempts ;
+     * - SOAP Fault (borne inconnue, occupee, badge refuse) : ChargerFaultException (404/409/403),
+     *   rien n'est enregistre.
+     */
     @Transactional
     public SessionResponse startSession(StartSessionRequest request) {
         Driver driver = driverRepository.findById(request.driverId())
@@ -62,39 +76,112 @@ public class SessionManagementService {
         Charger charger = chargerRepository.findById(request.chargerId())
                 .orElseThrow(() -> new ResourceNotFoundException("Borne", request.chargerId()));
 
-        if (charger.getStatus() == Charger.ChargerStatus.CHARGING) {
-            throw new InvalidSessionStateException("La borne " + charger.getId() + " est deja en cours de recharge");
+        if (charger.getStatus() == Charger.ChargerStatus.CHARGING
+                || charger.getStatus() == Charger.ChargerStatus.OCCUPIED) {
+            throw new InvalidSessionStateException("La borne " + charger.getId() + " est deja utilisee par une autre session");
+        }
+
+        Reservation reservation = null;
+        if (request.reservationId() != null) {
+            reservation = reservationRepository.findById(request.reservationId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Reservation", request.reservationId()));
+            if (!reservation.getDriverId().equals(driver.getId()) || !reservation.getChargerId().equals(charger.getId())
+                    || reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED) {
+                throw new InvalidSessionStateException("La reservation " + reservation.getId()
+                        + " n'est pas une reservation confirmee de ce conducteur sur cette borne");
+            }
         }
 
         ChargingSession session = new ChargingSession(driver.getId(), charger.getId(), request.reservationId());
-
         int connector = request.connectorId() != null ? request.connectorId() : 1;
-        String resIdStr = request.reservationId() != null ? request.reservationId().toString() : null;
 
-        // Appel SOAP inter-service avec CircuitBreaker Resilience4j & Retry
-        ChargerSoapClient.RemoteStartResult soapResult = chargerSoapClient.remoteStartTransaction(
-                charger.getId(), connector, driver.getBadgeId(), resIdStr, session.getId());
+        // Appel SOAP inter-service avec Retry et CircuitBreaker Resilience4j.
+        // Une SOAP Fault remonte en ChargerFaultException : la transaction est annulee.
+        ChargerSoapClient.RemoteStartResult soapResult = sendRemoteStart(session, charger, driver, connector);
 
         if (soapResult.accepted()) {
-            session.setStatus(ChargingSession.SessionStatus.ACTIVE);
-            session.setTransactionId(soapResult.transactionId());
-            charger.setStatus(Charger.ChargerStatus.CHARGING);
-            log.info("Session {} started actively with transactionId {}", session.getId(), soapResult.transactionId());
+            markActive(session, charger, reservation, soapResult.transactionId());
         } else if (soapResult.fallbackTriggered()) {
-            // Fallback Resilience4j : borne SOAP inaccessible ou circuit ouvert -> PENDING_START
+            // Fallback Resilience4j : passerelle SOAP injoignable ou circuit ouvert -> PENDING_START
             session.setStatus(ChargingSession.SessionStatus.PENDING_START);
             session.setTransactionId(null);
             charger.setStatus(Charger.ChargerStatus.OCCUPIED);
             log.warn("Session {} set to PENDING_START due to SOAP gateway fallback: {}", session.getId(), soapResult.message());
         } else {
-            session.setStatus(ChargingSession.SessionStatus.FAILED);
-            sessionRepository.save(session);
             throw new InvalidSessionStateException("Demarrage refuse par la borne: " + soapResult.message());
         }
 
         chargerRepository.save(charger);
         ChargingSession saved = sessionRepository.save(session);
         return toSessionResponse(saved);
+    }
+
+    /**
+     * Nouvel essai de demarrage d'une session PENDING_START (POST /sessions/{id}/start-attempts).
+     * - borne d'accord : session ACTIVE ;
+     * - passerelle toujours injoignable : 502, la session reste PENDING_START ;
+     * - refus de la borne (SOAP Fault ou REJECTED) : session FAILED, borne liberee, erreur metier.
+     */
+    @Transactional(noRollbackFor = {ChargerFaultException.class, InvalidSessionStateException.class})
+    public SessionResponse retryStart(String sessionId) {
+        ChargingSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session de charge", sessionId));
+        if (session.getStatus() != ChargingSession.SessionStatus.PENDING_START) {
+            throw new InvalidSessionStateException("La session " + sessionId + " n'est pas en attente de demarrage ("
+                    + session.getStatus() + ")");
+        }
+        Charger charger = chargerRepository.findById(session.getChargerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Borne", session.getChargerId()));
+        Driver driver = driverRepository.findById(session.getDriverId())
+                .orElseThrow(() -> new ResourceNotFoundException("Conducteur", session.getDriverId()));
+        Reservation reservation = session.getReservationId() != null
+                ? reservationRepository.findById(session.getReservationId()).orElse(null) : null;
+
+        ChargerSoapClient.RemoteStartResult soapResult;
+        try {
+            soapResult = sendRemoteStart(session, charger, driver, 1);
+        } catch (ChargerFaultException e) {
+            markFailed(session, charger);
+            throw e;
+        }
+
+        if (soapResult.fallbackTriggered()) {
+            throw new ChargerCommunicationException("Passerelle borne toujours injoignable, la session reste en PENDING_START");
+        }
+        if (!soapResult.accepted()) {
+            markFailed(session, charger);
+            throw new InvalidSessionStateException("Demarrage refuse par la borne: " + soapResult.message());
+        }
+
+        markActive(session, charger, reservation, soapResult.transactionId());
+        chargerRepository.save(charger);
+        return toSessionResponse(sessionRepository.save(session));
+    }
+
+    private ChargerSoapClient.RemoteStartResult sendRemoteStart(ChargingSession session, Charger charger,
+                                                                Driver driver, int connector) {
+        String resIdStr = session.getReservationId() != null ? session.getReservationId().toString() : null;
+        return chargerSoapClient.remoteStartTransaction(
+                charger.getId(), connector, driver.getBadgeId(), resIdStr, session.getId());
+    }
+
+    private void markActive(ChargingSession session, Charger charger, Reservation reservation, Integer transactionId) {
+        session.setStatus(ChargingSession.SessionStatus.ACTIVE);
+        session.setTransactionId(transactionId);
+        charger.setStatus(Charger.ChargerStatus.CHARGING);
+        if (reservation != null) {
+            reservation.setStatus(Reservation.ReservationStatus.ACTIVE);
+            reservationRepository.save(reservation);
+        }
+        log.info("Session {} started actively with transactionId {}", session.getId(), transactionId);
+    }
+
+    private void markFailed(ChargingSession session, Charger charger) {
+        session.setStatus(ChargingSession.SessionStatus.FAILED);
+        sessionRepository.save(session);
+        charger.setStatus(Charger.ChargerStatus.AVAILABLE);
+        chargerRepository.save(charger);
+        log.warn("Session {} failed: start refused by the charger, charger {} released", session.getId(), charger.getId());
     }
 
     @Transactional
@@ -109,12 +196,26 @@ public class SessionManagementService {
 
         if (session.getStatus() == ChargingSession.SessionStatus.COMPLETED ||
                 session.getStatus() == ChargingSession.SessionStatus.STOPPED ||
-                session.getStatus() == ChargingSession.SessionStatus.FAILED) {
+                session.getStatus() == ChargingSession.SessionStatus.FAILED ||
+                session.getStatus() == ChargingSession.SessionStatus.CANCELLED) {
             throw new InvalidSessionStateException("La session " + sessionId + " est deja cloturee");
         }
 
         Charger charger = chargerRepository.findById(session.getChargerId())
                 .orElse(null);
+
+        // Session jamais demarree sur la borne (PENDING_START) : annulation, borne liberee,
+        // pas de facture. La reservation reste CONFIRMED et peut servir a un nouvel essai.
+        if (session.getStatus() == ChargingSession.SessionStatus.PENDING_START) {
+            if (charger != null) {
+                charger.setStatus(Charger.ChargerStatus.AVAILABLE);
+                chargerRepository.save(charger);
+            }
+            session.setStoppedAt(Instant.now());
+            session.setStatus(ChargingSession.SessionStatus.CANCELLED);
+            log.info("Pending session {} cancelled, charger {} released", sessionId, session.getChargerId());
+            return toSessionResponse(sessionRepository.save(session));
+        }
 
         // Appel SOAP pour arreter la transaction
         if (session.getTransactionId() != null) {
@@ -171,6 +272,14 @@ public class SessionManagementService {
         session.setStatus(ChargingSession.SessionStatus.COMPLETED);
 
         ChargingSession savedSession = sessionRepository.save(session);
+
+        // la reservation utilisee par cette session est terminee
+        if (session.getReservationId() != null) {
+            reservationRepository.findById(session.getReservationId()).ifPresent(reservation -> {
+                reservation.setStatus(Reservation.ReservationStatus.COMPLETED);
+                reservationRepository.save(reservation);
+            });
+        }
 
         // Generation de la facture selon la logique de tarification
         Station station = charger != null ? charger.getStation() : null;

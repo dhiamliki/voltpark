@@ -48,6 +48,15 @@ public class SessionController {
         return sessionService.stopSession(id, request);
     }
 
+    /**
+     * Nouvel essai de demarrage d'une session PENDING_START (la passerelle SOAP etait injoignable).
+     * L'essai est traite tout de suite : la reponse est l'etat de la session (ACTIVE si la borne accepte).
+     */
+    @PostMapping("/{id}/start-attempts")
+    public SessionResponse retryStart(@PathVariable String id) {
+        return sessionService.retryStart(id);
+    }
+
     @GetMapping("/{id}")
     public SessionResponse getSession(@PathVariable String id) {
         return sessionService.getSession(id);

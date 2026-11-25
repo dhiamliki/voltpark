@@ -166,6 +166,8 @@ public class ChargingSession {
         ACTIVE,
         STOPPED,
         COMPLETED,
-        FAILED
+        FAILED,
+        // session PENDING_START arretee avant tout demarrage sur la borne
+        CANCELLED
     }
 }

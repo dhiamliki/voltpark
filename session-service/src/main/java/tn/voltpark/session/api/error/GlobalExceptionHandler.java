@@ -68,6 +68,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    /** SOAP Fault de la borne : statut choisi selon le code d'erreur (404, 409 ou 403). */
+    @ExceptionHandler(ChargerFaultException.class)
+    public ProblemDetail handleChargerFault(ChargerFaultException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(ex.getStatus(), ex.getMessage());
+        problem.setTitle("Demarrage refuse par la borne (SOAP Fault)");
+        problem.setType(URI.create("https://voltpark.tn/errors/charger-fault"));
+        problem.setProperty("errorCode", ex.getErrorCode());
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
     @ExceptionHandler(ChargerCommunicationException.class)
     public ProblemDetail handleChargerCommunication(ChargerCommunicationException ex) {
         log.warn("Charger communication error: {}", ex.getMessage());
