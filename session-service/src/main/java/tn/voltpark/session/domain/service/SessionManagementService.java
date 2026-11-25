@@ -71,7 +71,7 @@ public class SessionManagementService {
 
         // Appel SOAP inter-service avec CircuitBreaker Resilience4j & Retry
         ChargerSoapClient.RemoteStartResult soapResult = chargerSoapClient.remoteStartTransaction(
-                charger.getId(), connector, driver.getBadgeId(), resIdStr);
+                charger.getId(), connector, driver.getBadgeId(), resIdStr, session.getId());
 
         if (soapResult.accepted()) {
             session.setStatus(ChargingSession.SessionStatus.ACTIVE);

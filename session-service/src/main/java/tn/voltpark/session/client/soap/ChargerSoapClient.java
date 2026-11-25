@@ -28,7 +28,7 @@ public class ChargerSoapClient {
 
     @CircuitBreaker(name = "chargerGateway", fallbackMethod = "fallbackRemoteStart")
     @Retry(name = "chargerGateway")
-    public RemoteStartResult remoteStartTransaction(String chargerId, int connectorId, String idTag, String reservationId) {
+    public RemoteStartResult remoteStartTransaction(String chargerId, int connectorId, String idTag, String reservationId, String sessionId) {
         log.info("Sending SOAP RemoteStartTransaction to charger: chargerId={}, idTag={}", chargerId, idTag);
 
         RemoteStartTransactionRequest request = new RemoteStartTransactionRequest();
@@ -36,6 +36,7 @@ public class ChargerSoapClient {
         request.setConnectorId(connectorId);
         request.setIdTag(idTag);
         request.setReservationId(reservationId);
+        request.setSessionId(sessionId);
 
         RemoteStartTransactionResponse response = (RemoteStartTransactionResponse) webServiceTemplate.marshalSendAndReceive(request);
 
@@ -49,7 +50,7 @@ public class ChargerSoapClient {
         }
     }
 
-    public RemoteStartResult fallbackRemoteStart(String chargerId, int connectorId, String idTag, String reservationId, Throwable t) {
+    public RemoteStartResult fallbackRemoteStart(String chargerId, int connectorId, String idTag, String reservationId, String sessionId, Throwable t) {
         log.warn("Charger gateway SOAP communication failed for charger {} (circuit breaker / retry fallback active): {}",
                 chargerId, t.getMessage());
         return new RemoteStartResult(
