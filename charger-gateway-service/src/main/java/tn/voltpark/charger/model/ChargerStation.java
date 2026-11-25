@@ -24,6 +24,9 @@ public class ChargerStation {
 
     private String currentIdTag;
 
+    // session de charge (session-service) de la transaction en cours
+    private String currentSessionId;
+
     private Integer connectorId;
 
     private Instant updatedAt;
@@ -72,6 +75,14 @@ public class ChargerStation {
 
     public void setCurrentIdTag(String currentIdTag) {
         this.currentIdTag = currentIdTag;
+    }
+
+    public String getCurrentSessionId() {
+        return currentSessionId;
+    }
+
+    public void setCurrentSessionId(String currentSessionId) {
+        this.currentSessionId = currentSessionId;
     }
 
     public Integer getConnectorId() {
