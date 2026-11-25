@@ -1,10 +1,12 @@
 package tn.voltpark.session.api.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import tn.voltpark.energy.grpc.v1.SessionProgress;
 
 import java.time.Instant;
 
 /** Evenement "progress" du flux GET /api/v1/sessions/{id}/live. */
+@Schema(name = "LiveProgress")
 public record LiveProgressResponse(
         String sessionId,
         Instant timestamp,

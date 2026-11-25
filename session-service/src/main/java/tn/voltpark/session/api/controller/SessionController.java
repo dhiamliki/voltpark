@@ -1,13 +1,19 @@
 package tn.voltpark.session.api.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tn.voltpark.session.api.dto.InvoiceResponse;
+import tn.voltpark.session.api.dto.LiveProgressResponse;
 import tn.voltpark.session.api.dto.SessionResponse;
 import tn.voltpark.session.api.dto.StartSessionRequest;
 import tn.voltpark.session.api.dto.StopSessionRequest;
@@ -73,6 +79,16 @@ public class SessionController {
     }
 
     /** Suivi en direct (Server-Sent Events) relaye depuis WatchSession d'energy-service. */
+    @Operation(summary = "Suivi en direct de la session (Server-Sent Events)",
+            description = "Evenements progress (LiveProgress), end et error ; l'appel gRPC est annule a la deconnexion.",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Flux d'evenements",
+                            content = @Content(mediaType = MediaType.TEXT_EVENT_STREAM_VALUE,
+                                    schema = @Schema(implementation = LiveProgressResponse.class))),
+                    @ApiResponse(responseCode = "404", description = "Session inconnue",
+                            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                                    schema = @Schema(implementation = ProblemDetail.class)))
+            })
     @GetMapping(value = "/{id}/live", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter liveSession(@PathVariable String id) {
         return sessionLiveService.open(id);
