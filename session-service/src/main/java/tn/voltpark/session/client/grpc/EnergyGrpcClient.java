@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class EnergyGrpcClient {
 
     private static final Logger log = LoggerFactory.getLogger(EnergyGrpcClient.class);
+    private static final RetryableEnergyError RETRYABLE = new RetryableEnergyError();
 
     @GrpcClient("energy-service")
     private EnergyServiceGrpc.EnergyServiceBlockingStub energyStub;
@@ -69,6 +70,10 @@ public class EnergyGrpcClient {
 
     @SuppressWarnings("unused")
     private SessionEnergy energyUnavailable(String sessionId, StatusRuntimeException e) {
+        if (!RETRYABLE.test(e)) {
+            // INVALID_ARGUMENT, INTERNAL... : ce n'est pas une indisponibilite, l'erreur remonte
+            throw e;
+        }
         log.warn("energy-service unavailable for session {}: {}", sessionId, e.getStatus());
         return null;
     }
