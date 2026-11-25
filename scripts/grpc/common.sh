@@ -10,7 +10,8 @@ grpcurl_run() {
     docker run --rm -i --network "$NETWORK" fullstorydev/grpcurl:v1.9.1 -plaintext "$@"
 }
 
-# Derniere session creee par le simulateur (lue dans ses logs).
+# Derniere session demarree par le simulateur (lue dans ses logs) : session planifiee
+# (SIM-<horodatage>) ou session reelle demarree via session-service (UUID).
 latest_sim_session() {
-    docker logs charger-simulator 2>&1 | grep -o 'SIM-[0-9]*' | tail -n 1
+    docker logs charger-simulator 2>&1 | sed -n 's/.*Starting simulated session \([^ ]*\) on charger.*/\1/p' | tail -n 1
 }
