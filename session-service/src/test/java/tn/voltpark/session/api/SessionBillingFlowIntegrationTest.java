@@ -15,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import tn.voltpark.energy.grpc.v1.SessionProgress;
 import tn.voltpark.session.client.soap.ChargerSoapClient;
 import tn.voltpark.session.support.FakeEnergyServer;
@@ -29,6 +30,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
@@ -82,6 +84,13 @@ class SessionBillingFlowIntegrationTest {
         return sessionId;
     }
 
+    /** PATCH /sessions/{id} {"status":"STOPPED"} */
+    private static MockHttpServletRequestBuilder stop(String sessionId) {
+        return patch("/api/v1/sessions/{id}", sessionId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"STOPPED\"}");
+    }
+
     private JsonNode invoiceOf(String sessionId) throws Exception {
         String body = mvc.perform(get("/api/v1/sessions/{id}/invoice", sessionId))
                 .andExpect(status().isOk())
@@ -94,7 +103,7 @@ class SessionBillingFlowIntegrationTest {
         String sessionId = startSession("CP-TUN-001");
         energy.respondWith(10.0, 4.0, 6.0);
 
-        mvc.perform(post("/api/v1/sessions/{id}/stop", sessionId))
+        mvc.perform(stop(sessionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.totalEnergyKwh").value(10.0));
@@ -114,7 +123,7 @@ class SessionBillingFlowIntegrationTest {
         energy.failWith(Status.UNAVAILABLE);
 
         // l'arret reussit quand meme
-        mvc.perform(post("/api/v1/sessions/{id}/stop", sessionId))
+        mvc.perform(stop(sessionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"));
         JsonNode pending = invoiceOf(sessionId);
@@ -144,7 +153,7 @@ class SessionBillingFlowIntegrationTest {
         String sessionId = startSession("CP-TUN-003");
         energy.failWith(Status.NOT_FOUND);
 
-        mvc.perform(post("/api/v1/sessions/{id}/stop", sessionId)).andExpect(status().isOk());
+        mvc.perform(stop(sessionId)).andExpect(status().isOk());
 
         JsonNode invoice = invoiceOf(sessionId);
         assertThat(invoice.get("status").asText()).isEqualTo("ISSUED");
@@ -168,7 +177,7 @@ class SessionBillingFlowIntegrationTest {
         assertThat(body).contains("\"energyKwh\":1.25").contains("\"energyKwh\":2.5").contains("\"socPercent\":42");
         assertThat(body).contains("event:end");
 
-        mvc.perform(post("/api/v1/sessions/{id}/stop", sessionId)).andExpect(status().isOk());
+        mvc.perform(stop(sessionId)).andExpect(status().isOk());
     }
 
     @Test

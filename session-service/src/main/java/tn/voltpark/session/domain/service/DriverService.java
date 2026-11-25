@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tn.voltpark.session.api.dto.DriverRequest;
 import tn.voltpark.session.api.dto.DriverResponse;
+import tn.voltpark.session.api.error.ResourceConflictException;
 import tn.voltpark.session.api.error.ResourceNotFoundException;
 import tn.voltpark.session.domain.model.Driver;
 import tn.voltpark.session.repository.DriverRepository;
@@ -22,10 +23,10 @@ public class DriverService {
     @Transactional
     public DriverResponse createDriver(DriverRequest request) {
         if (driverRepository.existsByEmail(request.email())) {
-            throw new IllegalArgumentException("Un conducteur avec cet email existe deja: " + request.email());
+            throw new ResourceConflictException("Un conducteur avec cet email existe deja: " + request.email());
         }
         if (driverRepository.existsByBadgeId(request.badgeId())) {
-            throw new IllegalArgumentException("Ce badge RFID est deja utilise: " + request.badgeId());
+            throw new ResourceConflictException("Ce badge RFID est deja utilise: " + request.badgeId());
         }
 
         Driver driver = new Driver(request.name(), request.email(), request.badgeId(), request.phoneNumber());

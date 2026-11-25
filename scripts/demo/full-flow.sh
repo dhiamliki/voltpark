@@ -24,7 +24,7 @@ echo "$BODY" | tr '}' '\n' | sed -n 's/.*"id":\([0-9]*\),"name":"\([^"]*\)".*/  
 call GET /chargers
 echo "$BODY" | tr '}' '\n' | sed -n 's/.*"id":"\([^"]*\)".*"status":"\([^"]*\)".*/    borne \1 : \2/p'
 
-step "3. Reservation de la borne $CHARGER"
+step "3. Reservation de la borne $CHARGER (POST /reservations : 201 + Location)"
 call POST /reservations "{\"driverId\":$DRIVER_ID,\"chargerId\":\"$CHARGER\",\"startTime\":\"$(iso_in 5)\",\"endTime\":\"$(iso_in 1800)\"}"
 RESERVATION_ID=""
 if [ "$CODE" = "201" ]; then
@@ -36,19 +36,23 @@ else
     RESERVATION_JSON=""
 fi
 
-step "4. Demarrage de la session (session-service -> SOAP RemoteStartTransaction -> borne)"
+step "4. Demarrage de la session (POST /sessions -> SOAP RemoteStartTransaction -> borne)"
 call POST /sessions "{\"driverId\":$DRIVER_ID,\"chargerId\":\"$CHARGER\"$RESERVATION_JSON}"
 [ "$CODE" = "201" ] || fail "demarrage refuse : $BODY"
 SESSION_ID=$(echo "$BODY" | field id)
 info "session id=$SESSION_ID"
 info "statut $(echo "$BODY" | field status), transaction borne $(echo "$BODY" | field transactionId)"
+if [ -n "$RESERVATION_ID" ]; then
+    call GET "/reservations/$RESERVATION_ID"
+    info "reservation : statut $(echo "$BODY" | field status)"
+fi
 
 step "5. Suivi en direct pendant ${LIVE_SECONDS} s (GET /sessions/{id}/live, relais du flux gRPC WatchSession)"
 sleep 2
 follow_live "$SESSION_ID" "$LIVE_SECONDS"
 
-step "6. Arret de la session (SOAP RemoteStopTransaction, puis GetSessionEnergy en gRPC)"
-call POST "/sessions/$SESSION_ID/stop"
+step "6. Arret : PATCH /sessions/{id} {\"status\":\"STOPPED\"} (SOAP RemoteStopTransaction, puis GetSessionEnergy en gRPC)"
+stop_session "$SESSION_ID"
 info "statut $(echo "$BODY" | field status), energie $(echo "$BODY" | field totalEnergyKwh) kWh"
 
 step "7. Facture"
@@ -59,8 +63,9 @@ info "cout HP $(echo "$BODY" | field peakEnergyCost) + HC $(echo "$BODY" | field
 info "TOTAL : $(echo "$BODY" | field totalAmount) $(echo "$BODY" | field currency)"
 
 if [ -n "$RESERVATION_ID" ]; then
-    step "8. Liberation du creneau reserve (sinon il reste reserve pour la prochaine demonstration)"
-    call DELETE "/reservations/$RESERVATION_ID"
+    step "8. Reservation terminee avec la session (le creneau est libere)"
+    call GET "/reservations/$RESERVATION_ID"
+    info "reservation : statut $(echo "$BODY" | field status)"
 fi
 
 step "Termine"

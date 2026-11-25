@@ -3,10 +3,18 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      # En-tetes X-Forwarded-* (Host, Port, Proto) ajoutes vers les services en aval, pour que
+      # session-service construise ses en-tetes Location avec l'adresse de la gateway.
+      # La gateway ne les ajoute que pour les clients de ces adresses (expression reguliere) :
+      # boucle locale et reseaux prives (machine hote vue depuis Docker).
+      trusted-proxies: ${GATEWAY_TRUSTED_PROXIES:127\.0\.0\.1|0:0:0:0:0:0:0:1|10\..*|172\.(1[6-9]|2[0-9]|3[01])\..*|192\.168\..*}
       # Delais du client HTTP utilise pour appeler les services en aval
       httpclient:
         connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:2000}
-        response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:5s}
+        # plus long que le budget des nouveaux essais de session-service vers la passerelle SOAP
+        # (2 a 3 essais avec backoff, environ 7 s au pire) : sinon la gateway repondrait 503 alors que
+        # session-service termine quand meme l'action (session creee en PENDING_START)
+        response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:10s}
       # CORS gere une seule fois ici, pour toutes les routes (le frontend appelle uniquement la gateway)
       globalcors:
         add-to-simple-url-handler-mapping: true
@@ -23,8 +31,8 @@ spring:
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
       routes:
         # Suivi en direct d'une session (Server-Sent Events). Flux long : il ne passe ni par le
-        # circuit breaker (son time limiter couperait le flux apres 5 s) ni par le retry, et il a
-        # son propre delai de reponse (1 h, en ms) a la place des 5 s globaux.
+        # circuit breaker (son time limiter couperait le flux apres 10 s) ni par le retry, et il a
+        # son propre delai de reponse (1 h, en ms) a la place des 10 s globaux.
         # Les reponses text/event-stream sont transmises evenement par evenement, sans mise en tampon.
         - id: session-live
           uri: ${SESSION_SERVICE_URL:http://session-service:8081}
@@ -90,7 +98,7 @@ resilience4j:
     instances:
       sessionService:
         # meme valeur que le response-timeout du client HTTP
-        timeout-duration: ${GATEWAY_RESPONSE_TIMEOUT:5s}
+        timeout-duration: ${GATEWAY_RESPONSE_TIMEOUT:10s}
 
 management:
   endpoints:

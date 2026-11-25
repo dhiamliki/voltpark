@@ -6,6 +6,7 @@ import tn.voltpark.session.api.dto.ChargerRequest;
 import tn.voltpark.session.api.dto.ChargerResponse;
 import tn.voltpark.session.api.dto.StationRequest;
 import tn.voltpark.session.api.dto.StationResponse;
+import tn.voltpark.session.api.error.ResourceConflictException;
 import tn.voltpark.session.api.error.ResourceNotFoundException;
 import tn.voltpark.session.domain.model.Charger;
 import tn.voltpark.session.domain.model.Station;
@@ -55,6 +56,9 @@ public class StationService {
 
     @Transactional
     public ChargerResponse createCharger(ChargerRequest request) {
+        if (chargerRepository.existsById(request.id())) {
+            throw new ResourceConflictException("Une borne avec cet identifiant existe deja: " + request.id());
+        }
         Station station = stationRepository.findById(request.stationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Station", request.stationId()));
 

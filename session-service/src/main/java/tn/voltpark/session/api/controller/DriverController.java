@@ -2,11 +2,14 @@ package tn.voltpark.session.api.controller;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tn.voltpark.session.api.dto.DriverRequest;
 import tn.voltpark.session.api.dto.DriverResponse;
 import tn.voltpark.session.domain.service.DriverService;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -20,9 +23,12 @@ public class DriverController {
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public DriverResponse createDriver(@Valid @RequestBody DriverRequest request) {
-        return driverService.createDriver(request);
+    @ResponseStatus(HttpStatus.CREATED) // documente le 201 dans /v3/api-docs
+    public ResponseEntity<DriverResponse> createDriver(@Valid @RequestBody DriverRequest request) {
+        DriverResponse created = driverService.createDriver(request);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}").buildAndExpand(created.id()).toUri();
+        return ResponseEntity.created(location).body(created);
     }
 
     @GetMapping("/{id}")

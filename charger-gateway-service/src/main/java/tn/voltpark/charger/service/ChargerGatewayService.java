@@ -7,14 +7,15 @@ import org.springframework.transaction.annotation.Transactional;
 import tn.voltpark.charger.client.SimulatorClient;
 import tn.voltpark.charger.model.AuthorizedBadge;
 import tn.voltpark.charger.model.ChargerStation;
+import tn.voltpark.charger.model.ChargerTransaction;
 import tn.voltpark.charger.repository.AuthorizedBadgeRepository;
 import tn.voltpark.charger.repository.ChargerStationRepository;
+import tn.voltpark.charger.repository.ChargerTransactionRepository;
 import tn.voltpark.charger.ws.*;
 
 import javax.xml.datatype.DatatypeFactory;
 import java.time.Instant;
 import java.util.GregorianCalendar;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class ChargerGatewayService {
@@ -22,14 +23,16 @@ public class ChargerGatewayService {
     private static final Logger log = LoggerFactory.getLogger(ChargerGatewayService.class);
     private final ChargerStationRepository chargerRepository;
     private final AuthorizedBadgeRepository badgeRepository;
+    private final ChargerTransactionRepository transactionRepository;
     private final SimulatorClient simulatorClient;
-    private final AtomicInteger transactionSequence = new AtomicInteger(1000);
 
     public ChargerGatewayService(ChargerStationRepository chargerRepository,
                                  AuthorizedBadgeRepository badgeRepository,
+                                 ChargerTransactionRepository transactionRepository,
                                  SimulatorClient simulatorClient) {
         this.chargerRepository = chargerRepository;
         this.badgeRepository = badgeRepository;
+        this.transactionRepository = transactionRepository;
         this.simulatorClient = simulatorClient;
     }
 
@@ -56,8 +59,10 @@ public class ChargerGatewayService {
             throw new ChargerOccupiedException(charger.getChargerId(), charger.getCurrentTransactionId());
         }
 
-        // 4. Demarrage de la transaction
-        int txId = transactionSequence.incrementAndGet();
+        // 4. Demarrage de la transaction : numero donne par la sequence de la base (sans etat en memoire)
+        ChargerTransaction transaction = transactionRepository.save(
+                new ChargerTransaction(charger.getChargerId(), request.getIdTag(), request.getSessionId()));
+        int txId = transaction.getId();
         charger.setStatus(ChargerStatus.CHARGING);
         charger.setCurrentTransactionId(txId);
         charger.setCurrentIdTag(request.getIdTag());
@@ -84,6 +89,16 @@ public class ChargerGatewayService {
 
         ChargerStation charger = chargerRepository.findByChargerId(request.getChargerId())
                 .orElseThrow(() -> new ChargerNotFoundException(request.getChargerId()));
+
+        // seule la transaction en cours de la borne peut etre arretee
+        Integer currentTransactionId = charger.getCurrentTransactionId();
+        if (currentTransactionId == null || currentTransactionId != request.getTransactionId()) {
+            throw new InvalidTransactionException(charger.getChargerId(), request.getTransactionId(), currentTransactionId);
+        }
+        transactionRepository.findById(currentTransactionId).ifPresent(transaction -> {
+            transaction.setStoppedAt(Instant.now());
+            transactionRepository.save(transaction);
+        });
 
         String sessionId = charger.getCurrentSessionId();
         charger.setStatus(ChargerStatus.AVAILABLE);

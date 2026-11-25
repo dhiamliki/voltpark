@@ -86,6 +86,24 @@ docker compose up --build
 
 Le charger-simulator n'est pas exposé sur l'hôte (port 8084 interne : healthcheck et API `/api/simulations` appelée par charger-gateway-service). Par défaut (`SIMULATOR_ENABLED=false`), il n'envoie des mesures que pour les sessions démarrées via session-service ; avec `SIMULATOR_ENABLED=true`, il lance en plus des sessions aléatoires `SIM-...` toutes les `SIMULATOR_INTERVAL_SECONDS` secondes.
 
+## API REST (session-service)
+
+Contrat : `session-service/src/main/resources/openapi/openapi.yaml` (copie identique dans `contracts/openapi.yaml`), version générée depuis le code sur `/v3/api-docs` et Swagger UI sur `/swagger-ui.html` (via la gateway).
+
+| Action | Requête | Réponse |
+|---|---|---|
+| Créer (conducteur, station, borne, réservation) | `POST /api/v1/drivers`, `/stations`, `/chargers`, `/reservations` | 201 + en-tête `Location` |
+| Annuler une réservation | `DELETE /api/v1/reservations/{id}` | 204 sans corps |
+| Démarrer une session | `POST /api/v1/sessions` | 201 + `Location`, statut `ACTIVE` ou `PENDING_START` |
+| Nouvel essai d'une session `PENDING_START` | `POST /api/v1/sessions/{id}/start-attempts` | 200 `ACTIVE`, 502 si la passerelle est toujours injoignable |
+| Arrêter une session | `PATCH /api/v1/sessions/{id}` avec `{"status":"STOPPED"}` | 200 (`COMPLETED`, ou `CANCELLED` pour une session jamais démarrée), 409 si déjà arrêtée |
+| Suivi en direct | `GET /api/v1/sessions/{id}/live` | flux `text/event-stream` |
+| Recalcul d'une facture `PENDING_ENERGY` | `POST /api/v1/invoices/{id}/recalculation` | 200, 503 si energy-service est indisponible |
+
+Erreurs, toutes au format ProblemDetail (`application/problem+json`) : 400 (validation avec `invalidParams`, JSON illisible, paramètre du mauvais type comme `/drivers/abc`), 404 (ressource ou URL inconnue), 405 (méthode non supportée), 409 (email ou badge déjà utilisé, créneau déjà réservé, session déjà arrêtée), 403 / 404 / 409 pour un refus de la borne (SOAP Fault `BADGE_REFUSED`, `CHARGER_NOT_FOUND`, `CHARGER_OCCUPIED`, avec le champ `errorCode`).
+
+Une SOAP Fault est une réponse métier de la borne : elle n'est jamais rejouée et ne compte pas pour le circuit breaker. Seules les pannes (connexion refusée, timeout, erreur 5xx) sont rejouées (3 essais, 300 puis 600 ms d'attente) puis mènent au fallback `PENDING_START`.
+
 ## API Gateway
 
 Le frontend n'appelle que l'api-gateway (port 8080), qui transmet les requêtes à session-service.
@@ -94,13 +112,13 @@ Le frontend n'appelle que l'api-gateway (port 8080), qui transmet les requêtes 
 
 | Route | Chemins | Destination |
 |---|---|---|
-| `session-live` | `/api/v1/sessions/*/live` | session-service, flux SSE : délai de réponse 1 h, ni retry ni circuit breaker (le time limiter couperait le flux après 5 s), évènements transmis un par un |
+| `session-live` | `/api/v1/sessions/*/live` | session-service, flux SSE : délai de réponse 1 h, ni retry ni circuit breaker (le time limiter couperait le flux après 10 s), évènements transmis un par un |
 | `session-api` | `/api/v1/**` | session-service (`SESSION_SERVICE_URL`) |
 | `session-docs` | `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` | session-service (Swagger UI via la gateway) |
 
 La liste des routes actives est visible sur http://localhost:8080/actuator/gateway/routes. Cet endpoint est en lecture seule : les requêtes qui modifieraient les routes (POST, DELETE) sont refusées avec 405.
 
-**Délais** : connexion `GATEWAY_CONNECT_TIMEOUT_MS` (2000 ms par défaut), réponse `GATEWAY_RESPONSE_TIMEOUT` (5 s par défaut).
+**Délais** : connexion `GATEWAY_CONNECT_TIMEOUT_MS` (2000 ms par défaut), réponse `GATEWAY_RESPONSE_TIMEOUT` (10 s par défaut, plus que le budget des nouveaux essais SOAP de session-service : sinon la gateway répondrait 503 pendant que session-service termine l'action).
 
 **Résilience (route `session-api`)**
 - Retry : uniquement pour les requêtes GET, 2 nouveaux essais sur 502, 503, 504 ou erreur de connexion, avec un délai croissant (100 ms, puis 200 ms, maximum 1 s). POST, PUT, PATCH et DELETE ne sont jamais rejoués : ils ne sont pas idempotents (risque de double réservation, par exemple).
@@ -200,9 +218,9 @@ Les scripts de `scripts/demo/` passent uniquement par l'API Gateway (comme le fr
 3. réservation de la borne `CP-TUN-001` ;
 4. démarrage de la session : session-service crée la session (UUID) et envoie `RemoteStartTransaction` en SOAP avec cet identifiant ; charger-gateway-service accepte et demande au simulateur de charger ; le simulateur envoie une mesure par seconde à energy-service (gRPC `StreamMeterValues`) ;
 5. suivi en direct pendant 15 s : `GET /api/v1/sessions/{id}/live` (Server-Sent Events, relais de `WatchSession`), une ligne par mesure (puissance, énergie, batterie) ;
-6. arrêt : `RemoteStopTransaction` en SOAP (le simulateur ferme son flux, energy-service clôture la session), puis `GetSessionEnergy` en gRPC ;
+6. arrêt avec `PATCH /api/v1/sessions/{id}` et `{"status":"STOPPED"}` : `RemoteStopTransaction` en SOAP (le simulateur ferme son flux, energy-service clôture la session), puis `GetSessionEnergy` en gRPC ;
 7. facture calculée avec l'énergie réellement mesurée (heures pleines / creuses, frais d'occupation) ;
-8. libération du créneau réservé.
+8. la réservation, passée à `ACTIVE` au démarrage, est maintenant `COMPLETED` : le créneau est libéré.
 
 Variables possibles : `DEMO_BADGE`, `DEMO_CHARGER`.
 
@@ -213,18 +231,13 @@ Variables possibles : `DEMO_BADGE`, `DEMO_CHARGER`.
 .\scripts\demo\failure.ps1
 ```
 
-- **A. Passerelle SOAP arrêtée** : le script arrête `charger-gateway-service` puis démarre une session. Le client SOAP de session-service (timeouts, retry, circuit breaker Resilience4j) échoue et le fallback crée la session en `PENDING_START` (réponse 201). Le service est ensuite redémarré et la session en attente est clôturée.
-- **B. energy-service arrêté à l'arrêt d'une session** : une session est démarrée normalement, puis `energy-service` est arrêté. L'arrêt de la session réussit quand même (200) : le client gRPC fait de nouveaux essais (UNAVAILABLE), le circuit `energyService` s'ouvre et la facture est créée avec le statut `PENDING_ENERGY` (montant 0). Un recalcul pendant la panne (`POST /api/v1/invoices/{id}/recalculation`) répond 503. Après le redémarrage d'energy-service, le recalcul répond 200 et la facture passe en `ISSUED` avec l'énergie mesurée avant la panne.
+- **A. Badge bloqué** : trois démarrages avec le badge `TAG-BLOCKED`. La borne répond par une SOAP Fault `BADGE_REFUSED` : réponse 403 à chaque fois, sans nouvel essai ni session `PENDING_START`. Un démarrage normal juste après passe en `ACTIVE` : les refus n'ont pas ouvert le circuit breaker.
+- **B. Passerelle SOAP arrêtée** : le script arrête `charger-gateway-service` puis démarre une session. Le client SOAP fait 3 essais avec un délai croissant, puis le fallback crée la session en `PENDING_START` (réponse 201). Un nouvel essai pendant la panne (`POST /api/v1/sessions/{id}/start-attempts`) répond 502. Après le redémarrage du service, le même appel répond 200 et la session passe en `ACTIVE`.
+- **C. energy-service arrêté à l'arrêt d'une session** : une session est démarrée normalement, puis `energy-service` est arrêté. L'arrêt de la session réussit quand même (200) : le client gRPC fait de nouveaux essais (UNAVAILABLE), le circuit `energyService` s'ouvre et la facture est créée avec le statut `PENDING_ENERGY` (montant 0). Un recalcul pendant la panne (`POST /api/v1/invoices/{id}/recalculation`) répond 503. Après le redémarrage d'energy-service, le recalcul répond 200 et la facture passe en `ISSUED` avec l'énergie mesurée avant la panne.
 
 Les scripts utilisent `docker stop` / `docker start` : ils doivent être lancés sur la machine qui exécute la stack.
 
-**Base existante** : Hibernate a créé une contrainte `CHECK` sur `invoices.status` avec les anciennes valeurs, et `ddl-auto: update` ne la met pas à jour. Sur une base créée avant l'ajout du statut `PENDING_ENERGY`, la supprimer une fois :
-
-```bash
-docker exec session-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;"'
-```
-
-(ou repartir d'une base vide avec `docker compose down -v`, ce qui efface toutes les données).
+**Base existante** : Hibernate crée des contraintes `CHECK` sur les colonnes de statut, et `ddl-auto: update` ne les met pas à jour quand un statut est ajouté (`PENDING_ENERGY`, `CANCELLED`). Après une mise à jour, repartir de bases vides : `docker compose down -v` (efface toutes les données, les données de démonstration sont recréées au démarrage).
 
 ## Planning indicatif
 
