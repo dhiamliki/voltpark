@@ -393,6 +393,9 @@ paths:
         POST /sessions/{id}/start-attempts ou a annuler avec PATCH {"status":"STOPPED"}.
         SOAP Fault de la borne (reponse metier, jamais reessayee) : 404 borne inconnue,
         409 borne occupee, 403 badge refuse ; aucune session n'est creee.
+        Sans reservationId (charge immediate), la borne doit etre AVAILABLE et ne pas etre reservee
+        par un autre conducteur dans les 30 prochaines minutes ; sinon 409 avant tout appel SOAP, avec
+        errorCode CHARGER_OCCUPIED, CHARGER_OUT_OF_SERVICE ou CHARGER_RESERVED.
       requestBody:
         required: true
         content:
@@ -922,7 +925,9 @@ components:
           format: int64
           minimum: 1
           nullable: true
-          description: reservation CONFIRMED du meme conducteur sur la meme borne (409 sinon)
+          description: >
+            optionnel. Absent : charge immediate (borne libre et non reservee par un autre conducteur
+            dans les 30 minutes). Present : reservation CONFIRMED du meme conducteur sur la meme borne (409 sinon).
         connectorId:
           type: integer
           minimum: 1

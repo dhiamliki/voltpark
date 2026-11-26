@@ -13,6 +13,7 @@ import tn.voltpark.session.api.error.EnergyDataNotFoundException;
 import tn.voltpark.session.api.error.EnergyUnavailableException;
 import tn.voltpark.session.api.error.ChargerCommunicationException;
 import tn.voltpark.session.api.error.ChargerFaultException;
+import tn.voltpark.session.api.error.ChargerUnavailableException;
 import tn.voltpark.session.api.error.InvalidSessionStateException;
 import tn.voltpark.session.api.error.ResourceNotFoundException;
 import tn.voltpark.session.client.grpc.EnergyGrpcClient;
@@ -25,7 +26,11 @@ import tn.voltpark.session.repository.InvoiceRepository;
 import tn.voltpark.session.repository.ReservationRepository;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -60,8 +65,16 @@ public class SessionManagementService {
         this.tariffCalculationService = tariffCalculationService;
     }
 
+    /** Sans reservation, la borne doit etre libre de toute reservation d'un autre conducteur pendant ce delai. */
+    static final Duration WALK_IN_MARGIN = Duration.ofMinutes(30);
+    private static final ZoneId TUNIS = ZoneId.of("Africa/Tunis");
+    private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm");
+
     /**
      * Demarre une session : appel SOAP RemoteStartTransaction.
+     * Sans reservationId (charge immediate), la borne doit etre AVAILABLE et non reservee par un autre
+     * conducteur dans les 30 prochaines minutes, sinon 409 (ChargerUnavailableException).
+     * Avec reservationId, la reservation doit etre CONFIRMED, du meme conducteur et sur cette borne.
      * - borne d'accord : session ACTIVE, borne CHARGING, reservation ACTIVE ;
      * - passerelle injoignable (fallback) : session PENDING_START, borne OCCUPIED (gardee pour
      *   cette session), a relancer avec POST /sessions/{id}/start-attempts ;
@@ -76,6 +89,9 @@ public class SessionManagementService {
         Charger charger = chargerRepository.findById(request.chargerId())
                 .orElseThrow(() -> new ResourceNotFoundException("Borne", request.chargerId()));
 
+        if (request.reservationId() == null) {
+            checkWalkIn(driver, charger);
+        }
         if (charger.getStatus() == Charger.ChargerStatus.CHARGING
                 || charger.getStatus() == Charger.ChargerStatus.OCCUPIED) {
             throw new InvalidSessionStateException("La borne " + charger.getId() + " est deja utilisee par une autre session");
@@ -114,6 +130,27 @@ public class SessionManagementService {
         chargerRepository.save(charger);
         ChargingSession saved = sessionRepository.save(session);
         return toSessionResponse(saved);
+    }
+
+    /** Charge immediate (sans reservation) : borne libre, en service et non reservee par un autre conducteur. */
+    private void checkWalkIn(Driver driver, Charger charger) {
+        switch (charger.getStatus()) {
+            case OCCUPIED, CHARGING -> throw new ChargerUnavailableException(ChargerUnavailableException.OCCUPIED,
+                    "La borne " + charger.getId() + " est occupee. Choisissez une autre borne de la station.");
+            case FAULTED, UNAVAILABLE -> throw new ChargerUnavailableException(ChargerUnavailableException.OUT_OF_SERVICE,
+                    "La borne " + charger.getId() + " est hors service.");
+            default -> {
+            }
+        }
+        Instant now = Instant.now();
+        reservationRepository.findOverlappingReservations(charger.getId(), now, now.plus(WALK_IN_MARGIN)).stream()
+                .filter(r -> !r.getDriverId().equals(driver.getId()))
+                .min(Comparator.comparing(Reservation::getStartTime))
+                .ifPresent(r -> {
+                    throw new ChargerUnavailableException(ChargerUnavailableException.RESERVED,
+                            "La borne " + charger.getId() + " est reservee par un autre conducteur a partir de "
+                                    + HOUR.format(r.getStartTime().atZone(TUNIS)) + ". Choisissez une autre borne.");
+                });
     }
 
     /**

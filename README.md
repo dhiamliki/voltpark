@@ -96,7 +96,7 @@ Contrat : `session-service/src/main/resources/openapi/openapi.yaml` (copie ident
 |---|---|---|
 | Créer (conducteur, station, borne, réservation) | `POST /api/v1/drivers`, `/stations`, `/chargers`, `/reservations` | 201 + en-tête `Location` |
 | Annuler une réservation | `DELETE /api/v1/reservations/{id}` | 204 sans corps |
-| Démarrer une session | `POST /api/v1/sessions` | 201 + `Location`, statut `ACTIVE` ou `PENDING_START` |
+| Démarrer une session (charge immédiate, ou avec `reservationId`) | `POST /api/v1/sessions` | 201 + `Location`, statut `ACTIVE` ou `PENDING_START` ; sans réservation, 409 si la borne est occupée, hors service ou réservée par un autre conducteur dans les 30 min (`errorCode` `CHARGER_OCCUPIED`, `CHARGER_OUT_OF_SERVICE`, `CHARGER_RESERVED`) |
 | Nouvel essai d'une session `PENDING_START` | `POST /api/v1/sessions/{id}/start-attempts` | 200 `ACTIVE`, 502 si la passerelle est toujours injoignable |
 | Arrêter une session | `PATCH /api/v1/sessions/{id}` avec `{"status":"STOPPED"}` | 200 (`COMPLETED`, ou `CANCELLED` pour une session jamais démarrée), 409 si déjà arrêtée |
 | Suivi en direct | `GET /api/v1/sessions/{id}/live` | flux `text/event-stream` |

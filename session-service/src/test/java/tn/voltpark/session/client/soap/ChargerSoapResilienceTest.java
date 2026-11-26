@@ -41,6 +41,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -312,5 +313,7 @@ class ChargerSoapResilienceTest {
                         .content("{\"driverId\":2,\"chargerId\":\"CP-175672-3\",\"reservationId\":" + reservationId + "}"))
                 .andExpect(status().isConflict());
         verify(webServiceTemplate, times(0)).marshalSendAndReceive(any());
+        // la reservation ne doit pas gener les demarrages sans reservation des autres tests
+        mvc.perform(delete("/api/v1/reservations/{id}", reservationId)).andExpect(status().isNoContent());
     }
 }

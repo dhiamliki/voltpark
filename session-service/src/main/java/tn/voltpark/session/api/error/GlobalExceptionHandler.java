@@ -59,6 +59,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    /** Demarrage sans reservation refuse (borne occupee, hors service ou reservee) : 409 avec errorCode. */
+    @ExceptionHandler(ChargerUnavailableException.class)
+    public ProblemDetail handleChargerUnavailable(ChargerUnavailableException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Borne indisponible");
+        problem.setType(URI.create("https://voltpark.tn/errors/charger-unavailable"));
+        problem.setProperty("errorCode", ex.getErrorCode());
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
     @ExceptionHandler(InvalidSessionStateException.class)
     public ProblemDetail handleInvalidSessionState(InvalidSessionStateException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
