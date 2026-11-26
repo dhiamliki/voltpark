@@ -145,7 +145,7 @@ docker run --rm -v "$PWD/api-gateway:/app" -w /app maven:3.9-eclipse-temurin-17 
 
 Application web du conducteur (`frontend/`) : React 19, TypeScript, Vite, React Router, carte Leaflet (react-leaflet) et icônes lucide-react. Elle n'appelle que l'API Gateway.
 
-![Tableau de bord : carte, station et vue d’ensemble](docs/screenshots/carte.png)
+![Carte : prochaine étape, filtres, fiche de la station avec « Charger maintenant »](docs/screenshots/carte.png)
 
 **Parcours de charge.** Un seul chemin évident, comme dans les applications de recharge : trouver une borne → charger maintenant → suivre la charge → arrêter → reçu. Réserver pour plus tard reste possible, en option.
 
@@ -156,6 +156,14 @@ Application web du conducteur (`frontend/`) : React 19, TypeScript, Vite, React 
 5. **Charge terminée** : ouvert automatiquement après l'arrêt (énergie, durée, heures pleines / creuses, total, statut), avec « Voir la facture » et « Retour à la carte ». Facture `PENDING_ENERGY` : explication et « Recalculer ».
 
 De la carte à la charge : 3 clics (épingle, « Charger maintenant », « Démarrer la charge »).
+
+| Accueil | Confirmation | Ma charge | Charge terminée |
+|---|---|---|---|
+| ![Accueil : comptes de démonstration](docs/screenshots/welcome.png) | ![Feuille « Charger maintenant »](docs/screenshots/sheet.png) | ![Charge en cours, simulation ×60](docs/screenshots/live.png) | ![Reçu après l’arrêt](docs/screenshots/receipt.png) |
+
+| Téléphone : carte | Feuille du bas | Ma charge | Reçu |
+|---|---|---|---|
+| ![Carte sur téléphone](docs/screenshots/carte-mobile.png) | ![Feuille du bas](docs/screenshots/sheet-mobile.png) | ![Ma charge sur téléphone](docs/screenshots/live-mobile.png) | ![Reçu sur téléphone](docs/screenshots/receipt-mobile.png) |
 
 **Pages**
 
@@ -193,7 +201,7 @@ VITE_API_BASE_URL=http://localhost:8080/api/v1 npm run dev     # http://localhos
 
 **Données de démonstration.** Les stations sont des bornes **réelles** de Tunisie, issues d'Open Charge Map (licence CC BY 4.0) : 14 stations publiques et opérationnelles (stations-service, aires d'autoroute, municipalité, centres commerciaux ; sans les concessionnaires), dont 7 aires de l'autoroute A1 Tunis - Sfax, et 28 bornes (fichier partagé `data/stations-tn.json`, voir [data/README.md](data/README.md)). La position, l'opérateur et les connecteurs sont réels ; la disponibilité, les prix et l'occupation sont simulés. Au premier démarrage (bases vides), session-service et charger-gateway-service créent ces stations et bornes avec les mêmes identifiants (`ST-OCM-460375`, `CP-460375-1`), 4 conducteurs (`TAG-BLOCKED` est refusé par les bornes), des sessions et factures sur les 7 derniers jours et quelques réservations. Pour repartir de ces données : `docker compose down -v`.
 
-**Captures d'écran** (`docs/screenshots/`) : tableau de bord sans session (`carte.png` en 1920 × 1080, `carte-1440.png`, `carte-mobile.png`) et avec une session en direct (`carte-live.png`, `carte-live-1440.png`, `carte-live-mobile.png`, `mobile-session.png`), `session-live.png`, `sessions.png`, `reservation.png`, `factures.png`, `facture.png`, `pending-start.png`.
+**Captures d'écran** (`docs/screenshots/`) : accueil (`welcome.png`, `welcome-mobile.png`) ; carte avec une station de l'A1 choisie (`carte.png` en 1920 × 1080, `carte-1440.png`, `carte-mobile.png`), pendant une charge (`carte-live.png`) et avec une réservation proche dans « prochaine étape » (`carte-reservation.png`) ; feuille « Charger maintenant » (`sheet.png`, `sheet-mobile.png`) et démarrage en attente (`pending-start.png`) ; Ma charge (`live.png`, `live-mobile.png`) ; reçu « Charge terminée » (`receipt.png`, `receipt-mobile.png`) ; `facture.png`, `historique.png`, `reservations.png`.
 
 ## Répartition des tâches
 
