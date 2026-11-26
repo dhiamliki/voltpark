@@ -3,7 +3,9 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { CalendarDays, FileText, Map as MapIcon, Menu, Search, Settings, User, UserRound, Users, X, Zap } from 'lucide-react'
 import { useDriver } from '../state/DriverContext'
 import { useSearch } from '../state/SearchContext'
+import { formatLongDay } from '../lib/format'
 import { DriverMenu } from './DriverMenu'
+import { NotificationBell } from './NotificationBell'
 import { ICON_STROKE } from './ui'
 
 const NAV = [
@@ -85,11 +87,41 @@ function SearchField() {
   )
 }
 
+const TITLES: Array<[RegExp, string]> = [
+  [/^\/$/, 'Carte'],
+  [/^\/sessions/, 'Mes sessions'],
+  [/^\/reservations/, 'Réservations'],
+  [/^\/factures\/.+/, 'Facture'],
+  [/^\/factures/, 'Factures'],
+  [/^\/parametres/, 'Paramètres'],
+]
+
+/** Titre de la page et salutation (prenom du conducteur et date du jour). */
+function PageTitle() {
+  const { pathname } = useLocation()
+  const { driver } = useDriver()
+  const title = TITLES.find(([pattern]) => pattern.test(pathname))?.[1] ?? 'VoltPark'
+  const firstName = driver?.name?.split(' ')[0]
+  const [today] = useState(() => formatLongDay(new Date()))
+  return (
+    <div className="topbar__title">
+      <h1>{title}</h1>
+      <p className="muted">
+        {firstName ? `Bonjour, ${firstName}` : 'Bienvenue sur VoltPark'} · <span className="topbar__date">{today}</span>
+      </p>
+    </div>
+  )
+}
+
 function TopBar() {
   return (
     <header className="topbar">
+      <PageTitle />
       <SearchField />
-      <DriverMenu />
+      <div className="topbar__actions">
+        <NotificationBell />
+        <DriverMenu />
+      </div>
     </header>
   )
 }

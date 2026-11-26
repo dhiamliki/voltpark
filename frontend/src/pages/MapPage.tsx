@@ -1,8 +1,10 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { ChevronRight, MapPinOff, SearchX, Zap } from 'lucide-react'
 import { voltpark, type Station } from '../api/voltpark'
 import { LiveSessionPanel } from '../components/LiveSessionPanel'
+import { NearbyStations } from '../components/NearbyStations'
+import { Overview } from '../components/Overview'
 import { StationCard } from '../components/StationCard'
 import { StationMap } from '../components/StationMap'
 import { Banner, CardSkeleton, EmptyState, ErrorBanner, ICON_STROKE, Pill, Skeleton } from '../components/ui'
@@ -31,7 +33,7 @@ function StationList({ stations, selectedId, onSelect }: { stations: Station[]; 
               <span className="station-list__text">
                 <strong>{station.name}</strong>
                 <span className="muted">
-                  {cityOf(station.address)} · {counts.available} disponible{counts.available > 1 ? 's' : ''}
+                  {cityOf(station.address)} · {counts.available}/{counts.total} disponibles
                 </span>
               </span>
               <ChevronRight size={18} strokeWidth={ICON_STROKE} aria-hidden />
@@ -43,35 +45,42 @@ function StationList({ stations, selectedId, onSelect }: { stations: Station[]; 
   )
 }
 
-/** Session en cours du conducteur, affichee sous la carte comme dans la maquette. */
-function CurrentSession() {
+/** Panneau du bas : session en direct, session en attente, ou vue d'ensemble. */
+function BottomPanel() {
   const { driver } = useDriver()
   const driverId = driver?.id
-  const { data: sessions } = useLoad(driverId ? () => voltpark.sessions(driverId) : null, `sessions-${driverId}`)
-  if (!driverId || !sessions) return null
-  const active = sessions.find((s) => s.status === 'ACTIVE')
-  const pending = sessions.find((s) => s.status === 'PENDING_START')
-  if (active) return <LiveSessionPanel session={active} />
-  if (pending) {
+  const sessions = useLoad(driverId ? () => voltpark.sessions(driverId) : null, `sessions-${driverId}`)
+  const invoices = useLoad(driverId ? () => voltpark.invoices(driverId) : null, `invoices-${driverId}`)
+  const reservations = useLoad(driverId ? () => voltpark.reservations(driverId) : null, `reservations-${driverId}`)
+
+  if (!driverId) {
     return (
-      <Banner title="Une session attend de démarrer" actions={<Link to="/sessions" className="btn btn--primary btn--small">Voir la session</Link>}>
-        La passerelle des bornes était injoignable au démarrage sur {pending.chargerId}.
+      <Banner title="Choisissez un conducteur" actions={<Link to="/parametres" className="btn btn--primary btn--small">Choisir</Link>}>
+        Sélectionnez votre profil pour voir votre consommation, vos sessions et vos factures.
       </Banner>
     )
   }
-  return (
-    <section className="card idle-session">
-      <span className="idle-session__icon">
-        <Zap size={20} strokeWidth={ICON_STROKE} aria-hidden />
-      </span>
-      <div>
-        <p className="idle-session__title">Aucune charge en cours</p>
-        <p className="muted">Réservez une borne, puis démarrez la charge depuis vos réservations.</p>
+  if (!sessions.data || !invoices.data) {
+    return (
+      <div className="overview">
+        <CardSkeleton lines={2} />
+        <CardSkeleton lines={2} />
+        <CardSkeleton lines={2} />
       </div>
-      <Link to="/reservations" className="btn btn--ghost btn--small">
-        Mes réservations
-      </Link>
-    </section>
+    )
+  }
+  const active = sessions.data.find((s) => s.status === 'ACTIVE')
+  const pending = sessions.data.find((s) => s.status === 'PENDING_START')
+  if (active) return <LiveSessionPanel session={active} />
+  return (
+    <>
+      {pending && (
+        <Banner title="Une session attend de démarrer" actions={<Link to="/sessions" className="btn btn--primary btn--small">Voir la session</Link>}>
+          La passerelle des bornes était injoignable au démarrage sur {pending.chargerId}.
+        </Banner>
+      )}
+      <Overview sessions={sessions.data} invoices={invoices.data} reservations={reservations.data ?? []} />
+    </>
   )
 }
 
@@ -81,7 +90,6 @@ export function MapPage() {
   const [selectedId, setSelectedId] = useState<number | undefined>()
   const [userPosition, setUserPosition] = useState<[number, number] | null>(null)
   const [tilesFailed, setTilesFailed] = useState(false)
-  const cardRef = useRef<HTMLDivElement>(null)
 
   const filtered = useMemo(() => {
     const q = normalize(query.trim())
@@ -94,10 +102,7 @@ export function MapPage() {
       ? distanceKm({ lat: userPosition[0], lng: userPosition[1] }, { lat: selected.latitude, lng: selected.longitude })
       : null
 
-  const open = useCallback((station: Station) => {
-    setSelectedId(station.id)
-    cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [])
+  const select = useCallback((station: Station) => setSelectedId(station.id), [])
   const onTilesFailed = useCallback(() => setTilesFailed(true), [])
 
   if (error && !stations) {
@@ -112,55 +117,61 @@ export function MapPage() {
 
   return (
     <div className="map-page">
-      <div className="map-page__grid">
-        <div className="map-page__map">
-          {loading && !stations ? (
-            <Skeleton height="100%" radius={16} />
-          ) : filtered.length === 0 ? (
-            <div className="card map-page__empty">
-              <EmptyState
-                icon={<SearchX size={24} strokeWidth={ICON_STROKE} />}
-                title="Aucune station trouvée"
-                text={query ? `Aucune station ne correspond à « ${query} ».` : 'Aucune station n’est encore enregistrée.'}
-              />
-            </div>
-          ) : tilesFailed ? (
-            <div className="card map-page__fallback">
-              <Banner title="Carte indisponible">
-                Les fonds de carte n’ont pas pu être chargés (pas d’accès à OpenStreetMap). Voici la liste des stations.
-              </Banner>
-              <StationList stations={filtered} selectedId={selected?.id} onSelect={open} />
-            </div>
-          ) : (
-            <StationMap
-              stations={filtered}
-              selectedId={selected?.id}
-              onSelect={(s) => setSelectedId(s.id)}
-              onOpen={open}
-              onLocated={setUserPosition}
-              userPosition={userPosition}
-              onTilesFailed={onTilesFailed}
+      <div className="map-page__map">
+        {loading && !stations ? (
+          <Skeleton height="100%" radius={16} />
+        ) : filtered.length === 0 ? (
+          <div className="card map-page__empty">
+            <EmptyState
+              icon={<SearchX size={24} strokeWidth={ICON_STROKE} />}
+              title="Aucune station trouvée"
+              text={query ? `Aucune station ne correspond à « ${query} ».` : 'Aucune station n’est encore enregistrée.'}
             />
-          )}
-        </div>
-        <div className="map-page__card" ref={cardRef}>
-          {loading && !stations ? (
-            <CardSkeleton lines={5} />
-          ) : selected ? (
-            <StationCard station={selected} distance={distance} />
-          ) : (
-            <div className="card">
-              <EmptyState icon={<MapPinOff size={24} strokeWidth={ICON_STROKE} />} title="Choisissez une station" text="Touchez une épingle sur la carte." />
-            </div>
-          )}
-        </div>
+          </div>
+        ) : tilesFailed ? (
+          <div className="card map-page__fallback">
+            <Banner title="Carte indisponible">
+              Les fonds de carte n’ont pas pu être chargés (pas d’accès à Internet). Voici la liste des stations.
+            </Banner>
+            <StationList stations={filtered} selectedId={selected?.id} onSelect={select} />
+          </div>
+        ) : (
+          <StationMap
+            stations={filtered}
+            selectedId={selected?.id}
+            popupId={selectedId}
+            onSelect={select}
+            onOpen={select}
+            onLocated={setUserPosition}
+            userPosition={userPosition}
+            onTilesFailed={onTilesFailed}
+          />
+        )}
+        {query && filtered.length > 0 && (
+          <p className="map-page__count">
+            <Pill tone="neutral">{filtered.length}</Pill> station{filtered.length > 1 ? 's' : ''} pour « {query} »
+          </p>
+        )}
       </div>
-      {filtered.length > 0 && query && (
-        <p className="map-page__count muted">
-          <Pill tone="neutral">{filtered.length}</Pill> station{filtered.length > 1 ? 's' : ''} pour « {query} »
-        </p>
-      )}
-      <CurrentSession />
+
+      <aside className="map-page__side" aria-label="Station sélectionnée">
+        {loading && !stations ? (
+          <CardSkeleton lines={6} />
+        ) : selected ? (
+          <>
+            <StationCard station={selected} distance={distance} />
+            <NearbyStations stations={filtered} selectedId={selected.id} userPosition={userPosition} onSelect={select} />
+          </>
+        ) : (
+          <div className="card">
+            <EmptyState icon={<MapPinOff size={24} strokeWidth={ICON_STROKE} />} title="Choisissez une station" text="Touchez une épingle sur la carte." />
+          </div>
+        )}
+      </aside>
+
+      <div className="map-page__bottom">
+        <BottomPanel />
+      </div>
     </div>
   )
 }

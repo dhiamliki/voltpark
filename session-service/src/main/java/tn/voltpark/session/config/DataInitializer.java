@@ -10,12 +10,14 @@ import tn.voltpark.session.domain.model.Charger;
 import tn.voltpark.session.domain.model.ChargingSession;
 import tn.voltpark.session.domain.model.Driver;
 import tn.voltpark.session.domain.model.Invoice;
+import tn.voltpark.session.domain.model.Reservation;
 import tn.voltpark.session.domain.model.Station;
 import tn.voltpark.session.domain.service.TariffCalculationService;
 import tn.voltpark.session.repository.ChargerRepository;
 import tn.voltpark.session.repository.ChargingSessionRepository;
 import tn.voltpark.session.repository.DriverRepository;
 import tn.voltpark.session.repository.InvoiceRepository;
+import tn.voltpark.session.repository.ReservationRepository;
 import tn.voltpark.session.repository.StationRepository;
 
 import java.math.BigDecimal;
@@ -141,6 +143,7 @@ public class DataInitializer implements CommandLineRunner {
     private final ChargerRepository chargerRepository;
     private final ChargingSessionRepository sessionRepository;
     private final InvoiceRepository invoiceRepository;
+    private final ReservationRepository reservationRepository;
     private final TariffCalculationService tariffCalculationService;
 
     public DataInitializer(DriverRepository driverRepository,
@@ -148,12 +151,14 @@ public class DataInitializer implements CommandLineRunner {
                            ChargerRepository chargerRepository,
                            ChargingSessionRepository sessionRepository,
                            InvoiceRepository invoiceRepository,
+                           ReservationRepository reservationRepository,
                            TariffCalculationService tariffCalculationService) {
         this.driverRepository = driverRepository;
         this.stationRepository = stationRepository;
         this.chargerRepository = chargerRepository;
         this.sessionRepository = sessionRepository;
         this.invoiceRepository = invoiceRepository;
+        this.reservationRepository = reservationRepository;
         this.tariffCalculationService = tariffCalculationService;
     }
 
@@ -183,8 +188,9 @@ public class DataInitializer implements CommandLineRunner {
             log.info("Preloaded {} stations and their chargers in session-service", STATIONS.size());
         }
 
-        if (sessionRepository.count() == 0 && invoiceRepository.count() == 0) {
+        if (sessionRepository.count() == 0 && invoiceRepository.count() == 0 && reservationRepository.count() == 0) {
             seedHistory();
+            seedUpcomingReservations();
         }
     }
 
@@ -214,7 +220,15 @@ public class DataInitializer implements CommandLineRunner {
             BigDecimal peak = total.multiply(new BigDecimal(seed.peakShare())).setScale(3, RoundingMode.HALF_UP);
             BigDecimal offPeak = total.subtract(peak);
 
-            ChargingSession session = new ChargingSession(driver.getId(), charger.getId(), null);
+            // une session sur deux a ete faite sur reservation (terminee avec la session)
+            Long reservationId = null;
+            if (index % 2 == 1) {
+                Reservation reservation = new Reservation(driver.getId(), charger.getId(),
+                        startedAt.minus(10, ChronoUnit.MINUTES), stoppedAt.plus(10, ChronoUnit.MINUTES));
+                reservation.setStatus(Reservation.ReservationStatus.COMPLETED);
+                reservationId = reservationRepository.save(reservation).getId();
+            }
+            ChargingSession session = new ChargingSession(driver.getId(), charger.getId(), reservationId);
             // identifiant fixe : memes donnees a chaque initialisation
             session.setId(UUID.nameUUIDFromBytes(("voltpark-demo-session-" + index).getBytes(StandardCharsets.UTF_8)).toString());
             session.setStatus(ChargingSession.SessionStatus.COMPLETED);
@@ -238,5 +252,28 @@ public class DataInitializer implements CommandLineRunner {
             invoiceRepository.save(invoice);
         }
         log.info("Preloaded {} completed sessions with invoices (last 7 days)", HISTORY.size());
+    }
+
+    /**
+     * Reservations a venir (demain et apres-demain) et une reservation annulee.
+     * Bornes non utilisees par les tests ni par les scripts de demonstration.
+     */
+    private void seedUpcomingReservations() {
+        List<Driver> drivers = driverRepository.findAll(Sort.by("id"));
+        if (drivers.size() < 3) {
+            return;
+        }
+        LocalDate today = LocalDate.now(TUNIS);
+        Instant tomorrow = today.plusDays(1).atTime(9, 0).atZone(TUNIS).toInstant();
+        Instant afterTomorrow = today.plusDays(2).atTime(18, 30).atZone(TUNIS).toInstant();
+        Instant yesterday = today.minusDays(1).atTime(17, 0).atZone(TUNIS).toInstant();
+
+        reservationRepository.save(new Reservation(drivers.get(1).getId(), "CP-TUN-007", tomorrow, tomorrow.plus(1, ChronoUnit.HOURS)));
+        reservationRepository.save(new Reservation(drivers.get(0).getId(), "CP-TUN-012", afterTomorrow, afterTomorrow.plus(90, ChronoUnit.MINUTES)));
+        reservationRepository.save(new Reservation(drivers.get(2).getId(), "CP-TUN-020", tomorrow, tomorrow.plus(1, ChronoUnit.HOURS)));
+        Reservation cancelled = new Reservation(drivers.get(1).getId(), "CP-SSE-001", yesterday, yesterday.plus(1, ChronoUnit.HOURS));
+        cancelled.setStatus(Reservation.ReservationStatus.CANCELLED);
+        reservationRepository.save(cancelled);
+        log.info("Preloaded upcoming and cancelled reservations");
     }
 }

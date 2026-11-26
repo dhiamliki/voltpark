@@ -67,7 +67,7 @@ export function SettingsPage() {
             <EmptyState
               icon={<UserPlus size={24} strokeWidth={ICON_STROKE} />}
               title="Ajouter un profil"
-              text="Le badge doit être autorisé par les bornes (TAG-001 ou TAG-002 dans les données de démonstration) pour pouvoir charger."
+              text="Le badge doit être autorisé par les bornes (TAG-001, TAG-002 ou TAG-003 dans les données de démonstration) pour pouvoir charger."
               action={
                 <button type="button" className="btn btn--ghost" onClick={() => setCreating(true)}>
                   Créer un conducteur

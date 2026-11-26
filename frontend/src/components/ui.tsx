@@ -93,3 +93,30 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
     </header>
   )
 }
+
+/** Carte d'indicateur : libelle avec icone, grand chiffre et unite, precision optionnelle. */
+export function Metric({ icon, label, value, unit, hint }: {
+  icon?: ReactNode
+  label: string
+  value: ReactNode
+  unit?: string
+  hint?: ReactNode
+}) {
+  return (
+    <div className="metric">
+      <span className="metric__label">
+        {icon}
+        {label}
+      </span>
+      <span className="metric__value">
+        <span className="tabular">{value}</span>
+        {unit && <span className="metric__unit">{unit}</span>}
+      </span>
+      {hint && <span className="metric__hint">{hint}</span>}
+    </div>
+  )
+}
+
+export function MetricStrip({ children }: { children: ReactNode }) {
+  return <section className="metric-strip">{children}</section>
+}

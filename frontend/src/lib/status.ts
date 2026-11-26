@@ -7,9 +7,26 @@ export function chargerTone(status?: Charger['status']): DotTone {
   return 'out'
 }
 
+export function chargerPillTone(status?: Charger['status']): PillTone {
+  const tone = chargerTone(status)
+  return tone === 'available' ? 'success' : tone === 'out' ? 'danger' : 'neutral'
+}
+
+/** Disponibilite d'une station, pour la couleur de son epingle : disponible, complete ou hors service. */
+export function stationTone(station?: Station): DotTone {
+  const chargers = station?.chargers ?? []
+  if (chargers.some((c) => c.status === 'AVAILABLE')) return 'available'
+  if (chargers.length > 0 && chargers.every((c) => chargerTone(c.status) === 'out')) return 'out'
+  return 'occupied'
+}
+
+export function maxPower(station?: Station): number {
+  return Math.max(0, ...(station?.chargers ?? []).map((c) => c.maxPowerKw ?? 0))
+}
+
 export const CHARGER_LABELS: Record<string, string> = {
   AVAILABLE: 'Disponible',
-  OCCUPIED: 'Réservée',
+  OCCUPIED: 'Occupée',
   CHARGING: 'En charge',
   FAULTED: 'En panne',
   UNAVAILABLE: 'Hors service',

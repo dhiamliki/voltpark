@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
-import { CalendarCheck, CalendarPlus, Play, X } from 'lucide-react'
+import { CalendarCheck, CalendarClock, CalendarPlus, CalendarX, Play, X, Zap } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { voltpark, type Reservation, type Station } from '../api/voltpark'
 import { StartErrorBanner, RequireDriver } from '../components/sessionParts'
-import { Banner, CardSkeleton, EmptyState, ErrorBanner, ICON_STROKE, PageHeader, Pill, StatusDot } from '../components/ui'
-import { formatDateTime, formatTime } from '../lib/format'
+import { Banner, CardSkeleton, EmptyState, ErrorBanner, ICON_STROKE, Metric, MetricStrip, PageHeader, Pill, StatusDot } from '../components/ui'
+import { formatDateTime, formatTime, shortName } from '../lib/format'
 import { CHARGER_LABELS, chargerTone, RESERVATION_LABELS } from '../lib/status'
 import { useLoad } from '../lib/useLoad'
 import { useStartSession } from '../lib/useStartSession'
@@ -107,8 +107,15 @@ function ReservationForm({ driverId, stations, onCreated }: { driverId: number; 
         <legend className="field__label">Borne</legend>
         <div className="charger-choice__options">
           {(station?.chargers ?? []).map((c) => (
-            <label key={c.id} className={`charger-option ${chargerId === c.id ? 'is-selected' : ''}`}>
-              <input type="radio" name="charger" value={c.id} checked={chargerId === c.id} onChange={() => setChargerId(c.id ?? '')} />
+            <label key={c.id} className={`charger-option ${chargerId === c.id ? 'is-selected' : ''} ${chargerTone(c.status) === 'out' ? 'is-disabled' : ''}`}>
+              <input
+                type="radio"
+                name="charger"
+                value={c.id}
+                checked={chargerId === c.id}
+                disabled={chargerTone(c.status) === 'out'}
+                onChange={() => setChargerId(c.id ?? '')}
+              />
               <span className="charger-option__top">
                 <StatusDot tone={chargerTone(c.status)} />
                 <strong>{c.id}</strong>
@@ -155,7 +162,7 @@ function ReservationForm({ driverId, stations, onCreated }: { driverId: number; 
   )
 }
 
-function UpcomingReservations({ reservations, stations, onChange }: {
+function ReservationTable({ reservations, stations, onChange }: {
   reservations: Reservation[]
   stations: Station[]
   onChange: () => void
@@ -163,11 +170,16 @@ function UpcomingReservations({ reservations, stations, onChange }: {
   const { start, startingId, error: startError } = useStartSession()
   const [cancelError, setCancelError] = useState<ApiError | null>(null)
   const [cancellingId, setCancellingId] = useState<number | null>(null)
+  const [showAll, setShowAll] = useState(false)
   const stationOf = (chargerId?: string) => stations.find((s) => s.chargers?.some((c) => c.id === chargerId))
 
   const upcoming = reservations
     .filter((r) => r.status === 'CONFIRMED' || r.status === 'ACTIVE')
     .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''))
+  const past = reservations
+    .filter((r) => r.status !== 'CONFIRMED' && r.status !== 'ACTIVE')
+    .sort((a, b) => (b.startTime ?? '').localeCompare(a.startTime ?? ''))
+  const rows = showAll ? [...upcoming, ...past] : upcoming
 
   async function cancel(reservation: Reservation) {
     if (reservation.id == null) return
@@ -187,44 +199,83 @@ function UpcomingReservations({ reservations, stations, onChange }: {
     <section className="card card--padded" aria-label="Mes réservations à venir">
       <h2 className="card__title">
         <CalendarCheck size={20} strokeWidth={ICON_STROKE} aria-hidden /> Mes réservations
+        {past.length > 0 && (
+          <button type="button" className="link-button card__count" onClick={() => setShowAll((v) => !v)}>
+            {showAll ? 'À venir seulement' : `Afficher l’historique (${past.length})`}
+          </button>
+        )}
       </h2>
       <StartErrorBanner error={startError} />
       <ErrorBanner error={cancelError} title="Annulation impossible" />
-      {upcoming.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState
           icon={<CalendarCheck size={24} strokeWidth={ICON_STROKE} />}
           title="Aucune réservation à venir"
           text="Choisissez une borne et un créneau pour réserver."
         />
       ) : (
-        <ul className="rows">
-          {upcoming.map((r) => (
-            <li key={r.id} className="row">
-              <div className="row__main">
-                <strong>{r.chargerId}</strong>
-                <span className="muted">{stationOf(r.chargerId)?.name}</span>
-                <span className="tabular">
-                  {formatDateTime(r.startTime)} → {formatTime(r.endTime)}
-                </span>
-              </div>
-              <Pill tone={r.status === 'ACTIVE' ? 'accent' : 'neutral'}>{RESERVATION_LABELS[r.status ?? 'CONFIRMED']}</Pill>
-              {r.status === 'CONFIRMED' && (
-                <div className="row__actions">
-                  <button type="button" className="btn btn--primary btn--small" onClick={() => start(r)} disabled={startingId !== null}>
-                    <Play size={14} strokeWidth={ICON_STROKE} fill="currentColor" aria-hidden />
-                    {startingId === r.id ? 'Démarrage…' : 'Démarrer la charge'}
-                  </button>
-                  <button type="button" className="btn btn--ghost btn--small" onClick={() => cancel(r)} disabled={cancellingId !== null}>
-                    <X size={14} strokeWidth={ICON_STROKE} aria-hidden />
-                    {cancellingId === r.id ? 'Annulation…' : 'Annuler'}
-                  </button>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th scope="col">Borne</th>
+                <th scope="col">Créneau</th>
+                <th scope="col">Statut</th>
+                <th scope="col" className="num">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <strong>{r.chargerId}</strong>
+                    <span className="table__sub">{shortName(stationOf(r.chargerId)?.name)}</span>
+                  </td>
+                  <td className="tabular">
+                    {formatDateTime(r.startTime)}
+                    <span className="table__sub">jusqu’à {formatTime(r.endTime)}</span>
+                  </td>
+                  <td>
+                    <Pill tone={r.status === 'ACTIVE' ? 'accent' : r.status === 'CONFIRMED' ? 'success' : 'neutral'}>
+                      {RESERVATION_LABELS[r.status ?? 'CONFIRMED']}
+                    </Pill>
+                  </td>
+                  <td className="num">
+                    {r.status === 'CONFIRMED' && (
+                      <div className="row__actions row__actions--end">
+                        <button type="button" className="btn btn--primary btn--small" onClick={() => start(r)} disabled={startingId !== null}>
+                          <Play size={14} strokeWidth={ICON_STROKE} fill="currentColor" aria-hidden />
+                          {startingId === r.id ? 'Démarrage…' : 'Démarrer la charge'}
+                        </button>
+                        <button type="button" className="btn btn--ghost btn--small" onClick={() => cancel(r)} disabled={cancellingId !== null}>
+                          <X size={14} strokeWidth={ICON_STROKE} aria-hidden />
+                          {cancellingId === r.id ? 'Annulation…' : 'Annuler'}
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
+  )
+}
+
+function ReservationSummary({ reservations }: { reservations: Reservation[] }) {
+  const count = (status: Reservation['status']) => reservations.filter((r) => r.status === status).length
+  const next = reservations
+    .filter((r) => r.status === 'CONFIRMED')
+    .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''))[0]
+  return (
+    <MetricStrip>
+      <Metric icon={<CalendarClock size={16} strokeWidth={ICON_STROKE} />} label="À venir" value={count('CONFIRMED')} hint={next ? `prochaine : ${formatDateTime(next.startTime)}` : 'aucune'} />
+      <Metric icon={<Zap size={16} strokeWidth={ICON_STROKE} />} label="En cours" value={count('ACTIVE')} hint="charge démarrée" />
+      <Metric icon={<CalendarCheck size={16} strokeWidth={ICON_STROKE} />} label="Terminées" value={count('COMPLETED')} />
+      <Metric icon={<CalendarX size={16} strokeWidth={ICON_STROKE} />} label="Annulées" value={count('CANCELLED')} />
+    </MetricStrip>
   )
 }
 
@@ -251,22 +302,25 @@ function ReservationsContent({ driverId }: { driverId: number }) {
     )
   }
   return (
-    <div className="two-columns">
-      <ReservationForm driverId={driverId} stations={stations.data} onCreated={reservations.reload} />
-      {reservations.error ? (
-        <ErrorBanner error={reservations.error} title="Impossible de charger vos réservations" />
-      ) : !reservations.data ? (
-        <CardSkeleton lines={4} />
-      ) : (
-        <UpcomingReservations
-          reservations={reservations.data}
-          stations={stations.data}
-          onChange={() => {
-            reservations.reload()
-            stations.reload()
-          }}
-        />
-      )}
+    <div className="stack">
+      <ReservationSummary reservations={reservations.data ?? []} />
+      <div className="two-columns two-columns--form">
+        <ReservationForm driverId={driverId} stations={stations.data} onCreated={reservations.reload} />
+        {reservations.error ? (
+          <ErrorBanner error={reservations.error} title="Impossible de charger vos réservations" />
+        ) : !reservations.data ? (
+          <CardSkeleton lines={4} />
+        ) : (
+          <ReservationTable
+            reservations={reservations.data}
+            stations={stations.data}
+            onChange={() => {
+              reservations.reload()
+              stations.reload()
+            }}
+          />
+        )}
+      </div>
     </div>
   )
 }
