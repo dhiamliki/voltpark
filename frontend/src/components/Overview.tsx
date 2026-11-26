@@ -73,9 +73,15 @@ export function Overview({ sessions, invoices, reservations }: {
         <div className="overview__cta">
           <StartErrorBanner error={error} />
           {next ? (
-            <button type="button" className="btn btn--primary btn--block" onClick={() => start(next)} disabled={startingId !== null}>
+            <button type="button" className="btn btn--primary btn--block overview__start" onClick={() => start(next)} disabled={startingId !== null}>
               <Play size={14} strokeWidth={ICON_STROKE} fill="currentColor" aria-hidden />
-              {startingId === next.id ? 'Démarrage…' : `Démarrer une charge · ${next.chargerId}`}
+              {startingId === next.id ? (
+                'Démarrage…'
+              ) : (
+                <span aria-label={`Démarrer une charge sur la borne ${next.chargerId}`}>
+                  Démarrer · <span className="nowrap">{next.chargerId}</span>
+                </span>
+              )}
             </button>
           ) : (
             <Link to="/reservations" className="btn btn--ghost btn--block">

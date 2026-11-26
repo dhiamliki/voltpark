@@ -9,6 +9,7 @@ import { StationCard } from '../components/StationCard'
 import { StationMap } from '../components/StationMap'
 import { Banner, CardSkeleton, EmptyState, ErrorBanner, ICON_STROKE, Pill, Skeleton } from '../components/ui'
 import { cityOf, distanceKm } from '../lib/format'
+import { matchesFilter, STATION_FILTERS, type StationFilter } from '../lib/regions'
 import { normalize, stationCounts } from '../lib/status'
 import { useLoad } from '../lib/useLoad'
 import { useDriver } from '../state/DriverContext'
@@ -42,6 +43,25 @@ function StationList({ stations, selectedId, onSelect }: { stations: Station[]; 
         )
       })}
     </ul>
+  )
+}
+
+/** Filtres rapides au-dessus de la carte ; "Autoroute A1" cadre aussi la carte sur le corridor. */
+function FilterChips({ value, onChange }: { value: StationFilter; onChange: (filter: StationFilter) => void }) {
+  return (
+    <div className="map-filters" role="group" aria-label="Filtrer les stations">
+      {STATION_FILTERS.map((filter) => (
+        <button
+          key={filter.id}
+          type="button"
+          className={`filter-chip ${value === filter.id ? 'is-active' : ''}`}
+          aria-pressed={value === filter.id}
+          onClick={() => onChange(filter.id)}
+        >
+          {filter.label}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -90,11 +110,14 @@ export function MapPage() {
   const [selectedId, setSelectedId] = useState<number | undefined>()
   const [userPosition, setUserPosition] = useState<[number, number] | null>(null)
   const [tilesFailed, setTilesFailed] = useState(false)
+  const [filter, setFilter] = useState<StationFilter>('all')
 
   const filtered = useMemo(() => {
     const q = normalize(query.trim())
-    return (stations ?? []).filter((s) => !q || normalize(`${s.name} ${s.address ?? ''}`).includes(q))
-  }, [stations, query])
+    return (stations ?? [])
+      .filter((s) => matchesFilter(s, filter))
+      .filter((s) => !q || normalize(`${s.name} ${s.address ?? ''} ${s.operator ?? ''}`).includes(q))
+  }, [stations, query, filter])
 
   const selected = filtered.find((s) => s.id === selectedId) ?? filtered[0]
   const distance =
@@ -118,6 +141,7 @@ export function MapPage() {
   return (
     <div className="map-page">
       <div className="map-page__map">
+        <FilterChips value={filter} onChange={setFilter} />
         {loading && !stations ? (
           <Skeleton height="100%" radius={16} />
         ) : filtered.length === 0 ? (
@@ -125,7 +149,13 @@ export function MapPage() {
             <EmptyState
               icon={<SearchX size={24} strokeWidth={ICON_STROKE} />}
               title="Aucune station trouvée"
-              text={query ? `Aucune station ne correspond à « ${query} ».` : 'Aucune station n’est encore enregistrée.'}
+              text={
+                query
+                  ? `Aucune station ne correspond à « ${query} ».`
+                  : filter !== 'all'
+                    ? 'Aucune station dans cette zone.'
+                    : 'Aucune station n’est encore enregistrée.'
+              }
             />
           </div>
         ) : tilesFailed ? (
@@ -145,6 +175,7 @@ export function MapPage() {
             onLocated={setUserPosition}
             userPosition={userPosition}
             onTilesFailed={onTilesFailed}
+            fitCorridor={filter === 'a1'}
           />
         )}
         {query && filtered.length > 0 && (

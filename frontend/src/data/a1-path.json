@@ -1,0 +1,20 @@
+{
+  "name": "Autoroute A1 Tunis - Sfax",
+  "approximate": true,
+  "note": "Trace simplifie de l'autoroute A1 (12 points, du nord au sud), pour l'affichage sur la carte et le rattachement des stations au corridor. Ce n'est pas le trace exact : l'ecart avec la route reelle peut atteindre quelques kilometres.",
+  "toleranceKm": 3,
+  "points": [
+    { "label": "Tunis (Ben Arous)", "lat": 36.770, "lon": 10.226 },
+    { "label": "Bir El Kassaa", "lat": 36.733, "lon": 10.224 },
+    { "label": "Mornag", "lat": 36.660, "lon": 10.360 },
+    { "label": "Grombalia", "lat": 36.580, "lon": 10.494 },
+    { "label": "Hammamet", "lat": 36.430, "lon": 10.550 },
+    { "label": "Sidi Khelifa", "lat": 36.247, "lon": 10.426 },
+    { "label": "Enfidha", "lat": 36.130, "lon": 10.400 },
+    { "label": "Sousse (Kalaa Kebira)", "lat": 35.850, "lon": 10.530 },
+    { "label": "El Borjine", "lat": 35.568, "lon": 10.613 },
+    { "label": "El Jem", "lat": 35.257, "lon": 10.652 },
+    { "label": "Agareb", "lat": 34.773, "lon": 10.611 },
+    { "label": "Sfax", "lat": 34.760, "lon": 10.680 }
+  ]
+}

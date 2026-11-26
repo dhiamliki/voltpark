@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
-import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet'
 import { ChevronRight, LocateFixed, Minus, Plus } from 'lucide-react'
 import type { Station } from '../api/voltpark'
 import { shortName } from '../lib/format'
+import { A1_PATH } from '../lib/regions'
 import { stationCounts, stationTone } from '../lib/status'
 import { ICON_STROKE, StatusDot } from './ui'
 
@@ -21,6 +22,11 @@ const TILES_URL =
   'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}'
 const TILES_ATTRIBUTION =
   import.meta.env.VITE_MAP_TILES_ATTRIBUTION ?? 'Tiles &copy; <a href="https://www.esri.com">Esri</a> &mdash; Esri, HERE, Garmin, OpenStreetMap contributors'
+/** Vert sauge du theme (--accent) : couleur du trace de l'A1. */
+const A1_COLOR = '#718875'
+/** Licence des donnees des stations (data/README.md). */
+const STATIONS_ATTRIBUTION =
+  'Bornes : <a href="https://openchargemap.org">Open Charge Map</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>)'
 
 /** Distance minimale (px) entre deux epingles ; plus proches, elles sont ecartees en cercle. */
 const MIN_PIN_DISTANCE = 42
@@ -125,21 +131,24 @@ function Declutter({ stations, onChange }: { stations: Station[]; onChange: (off
 }
 
 /**
- * Au chargement (et quand la liste change), la carte montre toutes les stations.
+ * Au chargement (et quand la liste change), la carte montre toutes les stations, ou tout le
+ * corridor de l'A1 avec le filtre "Autoroute A1".
  * Si la zone de la carte change de taille (panneau du bas charge ensuite), on recadre,
  * tant que l'utilisateur n'a pas deplace ou zoome la carte lui-meme.
  */
-function FitStations({ stations }: { stations: Station[] }) {
+function FitStations({ stations, corridor }: { stations: Station[]; corridor?: [number, number][] }) {
   const map = useMap()
-  const key = stations.map((s) => s.id).join(',')
+  const key = (corridor ? 'corridor:' : '') + stations.map((s) => s.id).join(',')
   useEffect(() => {
     let userMoved = false
     let fitting = false
     const fit = () => {
       if (userMoved) return
-      const coords = stations
-        .filter((s) => s.latitude != null && s.longitude != null)
-        .map((s) => [s.latitude, s.longitude] as [number, number])
+      const coords =
+        corridor ??
+        stations
+          .filter((s) => s.latitude != null && s.longitude != null)
+          .map((s) => [s.latitude, s.longitude] as [number, number])
       fitting = true
       map.invalidateSize()
       if (coords.length > 1) // marge plus grande en haut : la legende y est posee
@@ -210,8 +219,10 @@ function MapControls({ onLocated }: { onLocated: (position: [number, number]) =>
   )
 }
 
-export function StationMap({ stations, selectedId, popupId, onSelect, onOpen, onLocated, userPosition, onTilesFailed }: {
+export function StationMap({ stations, selectedId, popupId, onSelect, onOpen, onLocated, userPosition, onTilesFailed, fitCorridor = false }: {
   stations: Station[]
+  /** cadre la carte sur tout le trace de l'A1 (filtre "Autoroute A1") */
+  fitCorridor?: boolean
   selectedId?: number
   /** station choisie par l'utilisateur : sa bulle est ouverte (pas au premier affichage) */
   popupId?: number
@@ -250,7 +261,7 @@ export function StationMap({ stations, selectedId, popupId, onSelect, onOpen, on
     <div className="map">
       <MapContainer center={TUNIS} zoom={9} zoomControl={false} scrollWheelZoom className="map__leaflet">
         <TileLayer
-          attribution={TILES_ATTRIBUTION}
+          attribution={`${TILES_ATTRIBUTION} | ${STATIONS_ATTRIBUTION}`}
           url={TILES_URL}
           maxZoom={16}
           eventHandlers={{
@@ -258,7 +269,8 @@ export function StationMap({ stations, selectedId, popupId, onSelect, onOpen, on
             tileerror: () => setTiles((t) => ({ ...t, failed: t.failed + 1 })),
           }}
         />
-        <FitStations stations={stations} />
+        <Polyline positions={A1_PATH} pathOptions={{ className: 'map-a1', color: A1_COLOR, weight: 2.5, dashArray: '6 7', interactive: false }} />
+        <FitStations stations={stations} corridor={fitCorridor ? A1_PATH : undefined} />
         <Declutter stations={stations} onChange={setOffsets} />
         {stations.map((station) => {
           const counts = stationCounts(station)
@@ -299,6 +311,7 @@ export function StationMap({ stations, selectedId, popupId, onSelect, onOpen, on
         <span><StatusDot tone="available" /> Disponible</span>
         <span><StatusDot tone="occupied" /> Occupée</span>
         <span><StatusDot tone="out" /> Hors service</span>
+        <span><span className="map-legend__a1" aria-hidden /> Autoroute A1</span>
       </div>
     </div>
   )

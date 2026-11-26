@@ -40,6 +40,8 @@ Deux copies servent a initialiser les bases :
 - `charger-gateway-service/src/main/resources/data/stations-tn.json` (bornes et leur statut)
 
 Toute modification de l'original doit etre recopiee dans les deux copies, dans le meme commit.
+De meme, `data/a1-path.json` (trace approximatif de l'A1) est recopie dans
+`frontend/src/data/a1-path.json` pour dessiner le corridor sur la carte.
 Les deux services en tirent les memes identifiants et les memes statuts simules :
 
 - station : `ST-OCM-<ocmId>` (ex. `ST-OCM-460375`) ;

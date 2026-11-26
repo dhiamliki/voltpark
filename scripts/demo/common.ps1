@@ -27,7 +27,8 @@ function Invoke-Api {
     try {
         $response = Invoke-WebRequest @params
         $code = [int]$response.StatusCode
-        $content = $response.Content
+        # corps lu en UTF-8 (PowerShell 5.1 suppose ISO-8859-1 sans charset : noms de stations accentues ou en arabe)
+        $content = [System.Text.Encoding]::UTF8.GetString($response.RawContentStream.ToArray())
         $location = $response.Headers["Location"]
     } catch {
         if ($null -eq $_.Exception.Response) { throw }

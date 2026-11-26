@@ -35,7 +35,39 @@
   grid-area: map;
   position: relative;
   display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   min-height: 0;
+}
+
+/* filtres rapides au-dessus de la carte */
+.map-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.filter-chip {
+  height: 32px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.filter-chip:hover {
+  background: var(--accent-tint-soft);
+}
+
+.filter-chip.is-active {
+  background: var(--accent-tint);
+  border-color: var(--accent-tint-strong);
+  color: var(--primary);
 }
 
 .map-page__map > .map,
@@ -68,7 +100,7 @@
 
 .map-page__count {
   position: absolute;
-  top: var(--space-4);
+  top: calc(32px + var(--space-3) + var(--space-4));
   right: var(--space-4);
   z-index: 500;
   display: flex;
@@ -181,6 +213,30 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.map-legend .map-legend__a1 {
+  width: 18px;
+  height: 0;
+  border-top: 2.5px dashed var(--accent);
+}
+
+/* trace de l'autoroute A1 : fin, pointille, vert sauge */
+.map .map-a1 {
+  stroke-opacity: 0.85;
+}
+
+/* identifiants de borne longs (CP-460375-1) : le libelle peut passer sur deux lignes */
+.overview__start {
+  height: auto;
+  min-height: 44px;
+  padding-block: var(--space-2);
+  white-space: normal;
+  text-align: center;
+}
+
+.overview__start .nowrap {
+  white-space: nowrap;
 }
 
 .pin {
@@ -410,6 +466,36 @@
   align-items: flex-start;
   margin-top: calc(-1 * var(--space-2));
   color: var(--text-muted);
+}
+
+.station-card__operator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: calc(-1 * var(--space-1)) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.station-card__operator svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.station-card__connectors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.station-card__note {
+  margin: 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
 }
 
 .station-card__address svg {
@@ -1320,7 +1406,8 @@
     top: auto;
     left: auto;
     right: var(--space-2);
-    bottom: 22px;
+    /* au-dessus de l'attribution (fond de carte + Open Charge Map), sur deux lignes */
+    bottom: 40px;
     gap: var(--space-2);
     padding: 4px var(--space-3);
     font-size: 11px;
@@ -1328,7 +1415,8 @@
 
   .map-controls {
     left: var(--space-3);
-    bottom: var(--space-3);
+    /* au-dessus de la legende et de l'attribution */
+    bottom: 76px;
     gap: var(--space-2);
   }
 
