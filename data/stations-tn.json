@@ -1,0 +1,382 @@
+{
+  "source": "Open Charge Map (https://openchargemap.org)",
+  "licence": "CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)",
+  "fetchedAt": "2026-11-26",
+  "method": "manual",
+  "stations": [
+    {
+      "ocmId": 175670,
+      "name": "Route Nationale 1",
+      "address": "Route Nationale 1",
+      "town": "Sfax",
+      "latitude": 34.83899603761557,
+      "longitude": 10.764692355925376,
+      "operator": "TotalEnergies (FR)",
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "Type 2",
+          "powerKw": 22,
+          "current": "AC",
+          "quantity": 2
+        }
+      ],
+      "lastVerified": null,
+      "corridor": null
+    },
+    {
+      "ocmId": 175672,
+      "name": "Aire de Service El Jem",
+      "address": "Aire de Service El Jem",
+      "town": "El Jem",
+      "latitude": 35.25743210043021,
+      "longitude": 10.652192124270755,
+      "operator": "TotalEnergies (FR)",
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "Type 2",
+          "powerKw": 22,
+          "current": "AC",
+          "quantity": 1
+        },
+        {
+          "type": "CCS",
+          "powerKw": 50,
+          "current": "DC",
+          "quantity": 1
+        },
+        {
+          "type": "CHAdeMO",
+          "powerKw": 150,
+          "current": "DC",
+          "quantity": 1
+        }
+      ],
+      "lastVerified": null,
+      "corridor": "A1"
+    },
+    {
+      "ocmId": 175673,
+      "name": "Aire de Service Borjine",
+      "address": "Direction Sfax",
+      "town": "El Borjine",
+      "latitude": 35.568043061409355,
+      "longitude": 10.612785025111123,
+      "operator": "TotalEnergies (FR)",
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "Type 2",
+          "powerKw": 22,
+          "current": "AC",
+          "quantity": 2
+        },
+        {
+          "type": "CCS",
+          "powerKw": 50,
+          "current": "DC",
+          "quantity": 1
+        },
+        {
+          "type": "CHAdeMO",
+          "powerKw": 50,
+          "current": "DC",
+          "quantity": 1
+        }
+      ],
+      "lastVerified": null,
+      "corridor": "A1"
+    },
+    {
+      "ocmId": 175675,
+      "name": "Aire de Service TotalEnergies Grombalia",
+      "address": "Direction Sfax",
+      "town": "Essabala",
+      "latitude": 36.57973680890255,
+      "longitude": 10.493031491372562,
+      "operator": "TotalEnergies (FR)",
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "CCS",
+          "powerKw": 50,
+          "current": "DC",
+          "quantity": 1
+        },
+        {
+          "type": "CHAdeMO",
+          "powerKw": 50,
+          "current": "DC",
+          "quantity": 1
+        }
+      ],
+      "lastVerified": null,
+      "corridor": "A1"
+    },
+    {
+      "ocmId": 175677,
+      "name": "الطريق الوطنية تونس - المرسى",
+      "address": "الطريق الوطنية تونس - المرسى",
+      "town": "العوينة",
+      "latitude": 36.84922376026216,
+      "longitude": 10.265912540199224,
+      "operator": "TotalEnergies (FR)",
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "Type 2",
+          "powerKw": 7,
+          "current": "AC",
+          "quantity": 1
+        },
+        {
+          "type": "CCS",
+          "powerKw": 60,
+          "current": "DC",
+          "quantity": 2
+        }
+      ],
+      "lastVerified": null,
+      "corridor": null
+    },
+    {
+      "ocmId": 175904,
+      "name": "Route Nationale 1",
+      "address": "Route Nationale 1",
+      "town": "بوشمة",
+      "latitude": 33.89577579000985,
+      "longitude": 10.075005711477388,
+      "operator": "TotalEnergies (FR)",
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "Type 2",
+          "powerKw": 22,
+          "current": "AC",
+          "quantity": 2
+        }
+      ],
+      "lastVerified": null,
+      "corridor": null
+    },
+    {
+      "ocmId": 189069,
+      "name": "Total",
+      "address": "Total",
+      "town": "Sousse",
+      "latitude": 35.84049320890155,
+      "longitude": 10.622152316586835,
+      "operator": "TotalEnergies (FR)",
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "Type 2",
+          "powerKw": 22,
+          "current": "AC",
+          "quantity": 2
+        }
+      ],
+      "lastVerified": null,
+      "corridor": null
+    },
+    {
+      "ocmId": 189070,
+      "name": "Mall of Sousse",
+      "address": "Mall of Sousse ,4060, Kalâa Kebira, Tunisie",
+      "town": "Akouda",
+      "latitude": 35.9032998695984,
+      "longitude": 10.544724586897246,
+      "operator": "TotalEnergies (FR)",
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "Type 2",
+          "powerKw": 22,
+          "current": null,
+          "quantity": 1
+        }
+      ],
+      "lastVerified": null,
+      "corridor": null
+    },
+    {
+      "ocmId": 203502,
+      "name": "Aire de Service Shell Grombalia",
+      "address": "Direction Tunis",
+      "town": "Essabala",
+      "latitude": 36.58038602530614,
+      "longitude": 10.494660660603245,
+      "operator": null,
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "CCS",
+          "powerKw": 50,
+          "current": "DC",
+          "quantity": 1
+        },
+        {
+          "type": "CHAdeMO",
+          "powerKw": 50,
+          "current": "DC",
+          "quantity": 1
+        }
+      ],
+      "lastVerified": null,
+      "corridor": "A1"
+    },
+    {
+      "ocmId": 305758,
+      "name": "Station Agil",
+      "address": "Autoroute Marsa GP9",
+      "town": null,
+      "latitude": 36.83451992305517,
+      "longitude": 10.222202845933111,
+      "operator": null,
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "Type 2",
+          "powerKw": 22,
+          "current": "AC",
+          "quantity": 1
+        }
+      ],
+      "lastVerified": null,
+      "corridor": null
+    },
+    {
+      "ocmId": 460271,
+      "name": "Municipalité de Sfax",
+      "address": "Avenue Hedi Chaker",
+      "town": "Sfax",
+      "latitude": 34.73209689537957,
+      "longitude": 10.764369402374655,
+      "operator": null,
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "Type 2",
+          "powerKw": 22,
+          "current": "AC",
+          "quantity": 1
+        }
+      ],
+      "lastVerified": null,
+      "corridor": null
+    },
+    {
+      "ocmId": 460375,
+      "name": "Shell Sidi Khelifa - Direction Tunis",
+      "address": "Autoroute A1 direction Tunis",
+      "town": "Ain Rahma",
+      "latitude": 36.247161607668616,
+      "longitude": 10.425836973245396,
+      "operator": null,
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "CCS",
+          "powerKw": 50,
+          "current": "DC",
+          "quantity": 1
+        },
+        {
+          "type": "CHAdeMO",
+          "powerKw": 50,
+          "current": "DC",
+          "quantity": 1
+        }
+      ],
+      "lastVerified": null,
+      "corridor": "A1"
+    },
+    {
+      "ocmId": 460463,
+      "name": "Shell A1 Tunis-Sfax",
+      "address": "Bir El Kasaa",
+      "town": "El Mourouj",
+      "latitude": 36.73332923168846,
+      "longitude": 10.224416470214237,
+      "operator": null,
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "CCS",
+          "powerKw": 22,
+          "current": "DC",
+          "quantity": 1
+        }
+      ],
+      "lastVerified": null,
+      "corridor": "A1"
+    },
+    {
+      "ocmId": 460464,
+      "name": "BYD Showroom",
+      "address": "Rue Al Harir, Zone Industrielle",
+      "town": "Bir El Kassaa",
+      "latitude": 36.7380919660895,
+      "longitude": 10.221893425115354,
+      "operator": null,
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "CCS",
+          "powerKw": 50,
+          "current": "DC",
+          "quantity": 1
+        }
+      ],
+      "lastVerified": null,
+      "corridor": "A1"
+    },
+    {
+      "ocmId": 460618,
+      "name": "Station repos Agareb",
+      "address": "Autoroute A1 vers Tunis",
+      "town": "Agareb",
+      "latitude": 34.77263492260646,
+      "longitude": 10.611341261111761,
+      "operator": null,
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "Type 2",
+          "powerKw": 22,
+          "current": "AC",
+          "quantity": 1
+        },
+        {
+          "type": "CCS",
+          "powerKw": 40,
+          "current": "AC",
+          "quantity": 1
+        }
+      ],
+      "lastVerified": null,
+      "corridor": "A1"
+    },
+    {
+      "ocmId": 462507,
+      "name": "MG MAXI Marsa",
+      "address": "88 Av. Khaled Ibn El Walid",
+      "town": "Marsa",
+      "latitude": 36.8700651377041,
+      "longitude": 10.308513248096688,
+      "operator": null,
+      "usageType": "public",
+      "connections": [
+        {
+          "type": "CCS",
+          "powerKw": 60,
+          "current": "DC",
+          "quantity": 2
+        }
+      ],
+      "lastVerified": null,
+      "corridor": null
+    }
+  ]
+}
