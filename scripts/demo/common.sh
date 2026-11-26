@@ -65,9 +65,13 @@ wait_healthy() {
 }
 
 # Suivi en direct (SSE) pendant N secondes, une ligne par mesure.
+# curl s'arrete sur sa limite de temps (code 28) : c'est la fin normale du suivi. Son code de
+# sortie est transmis a la boucle par une derniere ligne CURL_EXIT:<code> (sh n'a pas pipefail).
 follow_live() {
-    curl -s -N --max-time "$2" -H 'Accept: text/event-stream' "$API/sessions/$1/live" | while read -r line; do
+    rc=0
+    { curl -s -N --max-time "$2" -H 'Accept: text/event-stream' "$API/sessions/$1/live"; c=$?; echo; echo "CURL_EXIT:$c"; } | while read -r line; do
         case "$line" in
+            CURL_EXIT:*) exit "${line#CURL_EXIT:}" ;;
             event:*) EVENT=${line#event:} ;;
             data:*)
                 if [ "$EVENT" = "progress" ]; then
@@ -77,5 +81,9 @@ follow_live() {
                     info "evenement $EVENT : ${line#data:}"
                 fi ;;
         esac
-    done
+    done || rc=$?
+    case "$rc" in
+        0|28) ;;
+        *) fail "suivi en direct interrompu (curl, code $rc)" ;;
+    esac
 }

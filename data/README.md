@@ -13,9 +13,13 @@
   de normalisation que l'import par l'API. Ces fiches n'affichent pas la date de dernière
   vérification : `lastVerified` vaut donc `null`.
 
-Contenu : les **16** lieux de Tunisie à la fois **opérationnels** et **publics** (sur 29 fiches) ;
-les lieux privés (hôtels, résidences, concessionnaires réservés aux clients) et ceux réservés aux
-membres sont écartés. Pour chaque station : `ocmId`, `name`, `address`, `town`, `latitude`,
+Contenu : **14** lieux de Tunisie à la fois **opérationnels** et **publics** (sur 29 fiches) :
+stations-service, aires d'autoroute, municipalité et centres commerciaux. Sont écartés les lieux
+privés (hôtels, résidences), ceux réservés aux membres et les **concessionnaires automobiles**
+(showrooms BYD et MG), même quand leur fiche est marquée publique. Sur l'A1, il ne reste que des
+stations-service et aires de repos de l'autoroute (7).
+
+Pour chaque station : `ocmId`, `name`, `address`, `town`, `latitude`,
 `longitude`, `operator` (`null` quand Open Charge Map ne le connaît pas), `usageType`,
 `connections` (type `CCS` / `CHAdeMO` / `Type 2`, `powerKw`, `current` AC/DC, `quantity`),
 `lastVerified` et `corridor`.

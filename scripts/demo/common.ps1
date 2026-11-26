@@ -68,6 +68,7 @@ function Wait-Healthy([string]$Container) {
 }
 
 # Suivi en direct (SSE) pendant N secondes, une ligne par mesure.
+# curl s'arrete sur sa limite de temps (code 28) : c'est la fin normale du suivi.
 function Watch-Live([string]$SessionId, [int]$Seconds) {
     $event = ""
     curl.exe -s -N --max-time $Seconds -H "Accept: text/event-stream" "$Api/sessions/$SessionId/live" | ForEach-Object {
@@ -81,6 +82,9 @@ function Watch-Live([string]$SessionId, [int]$Seconds) {
             }
         }
     }
+    $code = $LASTEXITCODE
+    if ($code -ne 0 -and $code -ne 28) { Stop-Demo "suivi en direct interrompu (curl, code $code)" }
+    $global:LASTEXITCODE = 0
 }
 
 function Get-DriverId([string]$Badge) {

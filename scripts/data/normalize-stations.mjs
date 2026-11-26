@@ -6,6 +6,8 @@
 // Regles :
 //   - on garde les lieux operationnels et publics (Public, Public - Pay At Location,
 //     Public - Notice Required) ; les lieux prives ou reserves aux membres sont ecartes ;
+//   - les concessionnaires automobiles (showrooms) sont ecartes, meme s'ils sont marques publics :
+//     seules restent les stations-service, aires d'autoroute, municipalites et centres commerciaux ;
 //   - les connecteurs sont regroupes par type (CCS, CHAdeMO, Type 2), puissance et courant ;
 //   - une station est rattachee au corridor "A1" si son adresse cite l'A1 ou si elle est
 //     a moins de toleranceKm (3 km) du trace approximatif de data/a1-path.json.
@@ -21,6 +23,10 @@ if (!input) {
 }
 
 const PUBLIC_USAGE = new Map([[1, "public"], [5, "semi-public"], [7, "semi-public"]]);
+// concessionnaires automobiles : nom contenant showroom / concession, ou fiches connues
+// (460464 BYD Showroom Bir El Kassaa, 462507 MG MAXI Marsa, 460465 Showroom MG Charguia)
+const DEALER_NAME = /showroom|concession|dealer/i;
+const DEALER_IDS = new Set([460464, 462507, 460465]);
 // pseudo-operateurs d'Open Charge Map : "(Unknown Operator)", "(Business Owner at Location)"
 const NO_OPERATOR = new Set([1, 45]);
 
@@ -80,6 +86,7 @@ function day(value) {
 const stations = pois
   .filter((poi) => poi.StatusType?.IsOperational === true)
   .filter((poi) => PUBLIC_USAGE.has(poi.UsageTypeID ?? poi.UsageType?.ID))
+  .filter((poi) => !DEALER_IDS.has(poi.ID) && !DEALER_NAME.test(poi.AddressInfo?.Title ?? ""))
   .map((poi) => {
     const info = poi.AddressInfo;
     const address = [info.AddressLine1, info.AddressLine2].filter(Boolean).join(", ");

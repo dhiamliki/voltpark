@@ -60,3 +60,4 @@ if ($ReservationId) {
 }
 
 Write-Step "Termine"
+exit 0

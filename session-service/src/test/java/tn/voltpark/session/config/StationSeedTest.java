@@ -13,14 +13,16 @@ class StationSeedTest {
     void readsRealStationsFromSharedFile() {
         List<DataInitializer.StationData> stations = DataInitializer.readStations();
 
-        assertThat(stations).hasSize(16);
+        assertThat(stations).hasSize(14);
+        // pas de concessionnaires automobiles (showrooms)
+        assertThat(stations).extracting(DataInitializer.StationData::ocmId).doesNotContain(460464L, 462507L);
         DataInitializer.StationData sidiKhelifa = stations.stream()
                 .filter(s -> s.ocmId() == 460375).findFirst().orElseThrow();
         assertThat(sidiKhelifa.corridor()).isEqualTo("A1");
         assertThat(sidiKhelifa.latitude()).isEqualTo(36.247161607668616);
         assertThat(sidiKhelifa.connections()).extracting(DataInitializer.ConnectionData::type)
                 .containsExactly("CCS", "CHAdeMO");
-        assertThat(stations.stream().filter(s -> "A1".equals(s.corridor()))).hasSize(8);
+        assertThat(stations.stream().filter(s -> "A1".equals(s.corridor()))).hasSize(7);
     }
 
     @Test

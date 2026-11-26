@@ -13,9 +13,9 @@ class StationSeedTest {
     void oneChargerPerChargingPointOfTheSharedFile() {
         Map<String, ChargerStatus> chargers = DataInitializer.chargersFromFile();
 
-        assertThat(chargers).hasSize(31);
+        assertThat(chargers).hasSize(28);
         assertThat(chargers).containsKeys("CP-460375-1", "CP-460375-2", "CP-175672-3", "CP-175673-4");
-        assertThat(chargers).doesNotContainKey("CP-460375-3");
+        assertThat(chargers).doesNotContainKeys("CP-460375-3", "CP-460464-1", "CP-462507-1");
     }
 
     @Test
@@ -27,6 +27,6 @@ class StationSeedTest {
         assertThat(chargers.get("CP-175672-3")).isEqualTo(ChargerStatus.AVAILABLE);
         assertThat(chargers.get("CP-460375-2")).isEqualTo(ChargerStatus.OCCUPIED);
         assertThat(chargers.get("CP-175677-3")).isEqualTo(ChargerStatus.FAULTED);
-        assertThat(chargers.values().stream().filter(s -> s == ChargerStatus.AVAILABLE)).hasSize(23);
+        assertThat(chargers.values().stream().filter(s -> s == ChargerStatus.AVAILABLE)).hasSize(20);
     }
 }

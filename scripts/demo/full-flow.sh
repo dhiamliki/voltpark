@@ -69,3 +69,4 @@ if [ -n "$RESERVATION_ID" ]; then
 fi
 
 step "Termine"
+exit 0

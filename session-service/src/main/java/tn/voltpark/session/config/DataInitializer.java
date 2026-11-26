@@ -78,14 +78,14 @@ public class DataInitializer implements CommandLineRunner {
     // conducteurs : index 0 = Rafaa (TAG-001), 1 = Dhia (TAG-002), 2 = Sarra (TAG-003)
     private static final List<HistorySeed> HISTORY = List.of(
             new HistorySeed(1, "CP-460375-1", 6, 8, 40, 55, "28.400", "0.90", true),   // Shell Sidi Khelifa (A1)
-            new HistorySeed(1, "CP-462507-1", 5, 18, 15, 70, "31.200", "0.55", true),  // MG MAXI Marsa
+            new HistorySeed(1, "CP-175677-2", 5, 18, 15, 70, "31.200", "0.55", true),  // TotalEnergies L'Aouina
             new HistorySeed(1, "CP-175675-1", 4, 11, 5, 30, "23.900", "1.00", true),   // TotalEnergies Grombalia (A1)
             new HistorySeed(1, "CP-175677-1", 3, 21, 30, 120, "12.800", "0.00", true), // TotalEnergies L'Aouina
-            new HistorySeed(1, "CP-460464-1", 2, 13, 20, 45, "24.300", "1.00", false), // BYD Bir El Kassaa
+            new HistorySeed(1, "CP-203502-1", 2, 13, 20, 45, "24.300", "1.00", false), // Shell Grombalia (A1)
             new HistorySeed(1, "CP-305758-1", 1, 7, 10, 60, "20.700", "0.40", false),  // Station Agil
             new HistorySeed(0, "CP-175672-3", 6, 12, 0, 35, "52.100", "1.00", true),   // El Jem (A1)
             new HistorySeed(0, "CP-175673-3", 4, 16, 45, 40, "31.500", "1.00", true),  // Borjine (A1)
-            new HistorySeed(0, "CP-462507-2", 2, 20, 30, 90, "17.800", "0.00", false), // MG MAXI Marsa
+            new HistorySeed(0, "CP-305758-1", 2, 20, 30, 90, "17.800", "0.00", false), // Station Agil
             new HistorySeed(0, "CP-460463-1", 0, 9, 15, 50, "17.400", "1.00", false),  // Shell Bir El Kassaa (A1)
             new HistorySeed(2, "CP-175670-1", 5, 19, 0, 80, "15.300", "0.30", true),   // TotalEnergies RN1 Sfax
             new HistorySeed(2, "CP-189069-1", 3, 10, 30, 75, "18.900", "1.00", true),  // TotalEnergies Sousse
@@ -299,7 +299,7 @@ public class DataInitializer implements CommandLineRunner {
         Instant yesterday = today.minusDays(1).atTime(17, 0).atZone(TUNIS).toInstant();
 
         reservationRepository.save(new Reservation(drivers.get(1).getId(), "CP-175673-3", tomorrow, tomorrow.plus(1, ChronoUnit.HOURS)));
-        reservationRepository.save(new Reservation(drivers.get(0).getId(), "CP-462507-1", afterTomorrow, afterTomorrow.plus(90, ChronoUnit.MINUTES)));
+        reservationRepository.save(new Reservation(drivers.get(0).getId(), "CP-175670-2", afterTomorrow, afterTomorrow.plus(90, ChronoUnit.MINUTES)));
         reservationRepository.save(new Reservation(drivers.get(2).getId(), "CP-460271-1", tomorrow, tomorrow.plus(1, ChronoUnit.HOURS)));
         Reservation cancelled = new Reservation(drivers.get(1).getId(), "CP-203502-1", yesterday, yesterday.plus(1, ChronoUnit.HOURS));
         cancelled.setStatus(Reservation.ReservationStatus.CANCELLED);
