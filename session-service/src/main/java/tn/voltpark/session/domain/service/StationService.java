@@ -95,7 +95,7 @@ public class StationService {
         List<ChargerResponse> chargers = s.getChargers() != null ?
                 s.getChargers().stream().map(this::toChargerResponse).toList() : List.of();
         return new StationResponse(
-                s.getId(), s.getName(), s.getAddress(), s.getLatitude(), s.getLongitude(),
+                s.getId(), s.getCode(), s.getName(), s.getOperator(), s.getCorridor(), s.getAddress(), s.getLatitude(), s.getLongitude(),
                 s.getPricePerKwh(), s.getPeakPricePerKwh(), s.getOffPeakPricePerKwh(), s.getIdleFeePerMinute(),
                 chargers
         );
@@ -108,7 +108,8 @@ public class StationService {
                 c.getStation() != null ? c.getStation().getName() : null,
                 c.getChargerType(),
                 c.getStatus(),
-                c.getMaxPowerKw()
+                c.getMaxPowerKw(),
+                c.getConnectorType()
         );
     }
 }

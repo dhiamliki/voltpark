@@ -154,7 +154,7 @@ class RestConventionsIntegrationTest {
 
         mvc.perform(post("/api/v1/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"driverId\":2,\"chargerId\":\"CP-TUN-001\",\"connectorId\":0}"))
+                        .content("{\"driverId\":2,\"chargerId\":\"CP-460375-1\",\"connectorId\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.invalidParams.connectorId").exists());
     }
@@ -207,7 +207,7 @@ class RestConventionsIntegrationTest {
     void oldVerbUrisAreGone() throws Exception {
         mvc.perform(post("/api/v1/sessions/start")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"driverId\":2,\"chargerId\":\"CP-TUN-001\"}"))
+                        .content("{\"driverId\":2,\"chargerId\":\"CP-460375-1\"}"))
                 .andExpect(status().is4xxClientError());
         mvc.perform(post("/api/v1/sessions/some-id/stop")).andExpect(status().isNotFound());
     }
@@ -235,7 +235,7 @@ class RestConventionsIntegrationTest {
         Instant start = Instant.now().plus(2, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
         MvcResult created = mvc.perform(post("/api/v1/reservations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"driverId\":1,\"chargerId\":\"CP-TUN-003\",\"startTime\":\"" + start
+                        .content("{\"driverId\":1,\"chargerId\":\"CP-175672-3\",\"startTime\":\"" + start
                                 + "\",\"endTime\":\"" + start.plus(1, ChronoUnit.HOURS) + "\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", matchesPattern("http://localhost/api/v1/reservations/\\d+")))
@@ -254,7 +254,7 @@ class RestConventionsIntegrationTest {
     void patchStatusStoppedStopsTheSessionOnce() throws Exception {
         MvcResult started = mvc.perform(post("/api/v1/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"driverId\":1,\"chargerId\":\"CP-TUN-002\"}"))
+                        .content("{\"driverId\":1,\"chargerId\":\"CP-175672-2\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", matchesPattern("http://localhost/api/v1/sessions/[0-9a-f-]{36}")))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))

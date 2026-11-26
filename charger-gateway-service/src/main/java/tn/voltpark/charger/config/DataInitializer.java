@@ -1,8 +1,11 @@
 package tn.voltpark.charger.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import tn.voltpark.charger.model.AuthorizedBadge;
 import tn.voltpark.charger.model.ChargerStation;
@@ -10,66 +13,34 @@ import tn.voltpark.charger.repository.AuthorizedBadgeRepository;
 import tn.voltpark.charger.repository.ChargerStationRepository;
 import tn.voltpark.charger.ws.ChargerStatus;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * Donnees de demonstration, inserees seulement si les tables sont vides.
- * Memes identifiants de bornes et memes statuts que dans session-service (DataInitializer).
+ * Bornes : fichier partage data/stations-tn.json (bornes reelles, Open Charge Map), avec les memes
+ * identifiants et les memes statuts simules que session-service (DataInitializer).
  */
 @Component
 public class DataInitializer implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
+    static final String STATIONS_FILE = "data/stations-tn.json";
 
-    private static final Map<String, ChargerStatus> CHARGERS = new LinkedHashMap<>();
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record StationData(long ocmId, List<ConnectionData> connections) {
+    }
 
-    static {
-        // Tunis Centre (CP-TUN-001/002 : tests et scripts de demonstration)
-        CHARGERS.put("CP-TUN-001", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-TUN-002", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-TUN-004", ChargerStatus.OCCUPIED);
-        CHARGERS.put("CP-TUN-005", ChargerStatus.AVAILABLE);
-        // Les Berges du Lac 2
-        CHARGERS.put("CP-TUN-003", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-TUN-006", ChargerStatus.OCCUPIED);
-        CHARGERS.put("CP-TUN-007", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-TUN-008", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-TUN-009", ChargerStatus.OCCUPIED);
-        CHARGERS.put("CP-TUN-010", ChargerStatus.AVAILABLE);
-        // Berges du Lac 1
-        CHARGERS.put("CP-TUN-011", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-TUN-012", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-TUN-013", ChargerStatus.FAULTED);
-        // La Marsa
-        CHARGERS.put("CP-TUN-014", ChargerStatus.OCCUPIED);
-        CHARGERS.put("CP-TUN-015", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-TUN-016", ChargerStatus.AVAILABLE);
-        // Ariana
-        CHARGERS.put("CP-TUN-017", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-TUN-018", ChargerStatus.OCCUPIED);
-        // El Menzah 6
-        CHARGERS.put("CP-TUN-019", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-TUN-020", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-TUN-021", ChargerStatus.UNAVAILABLE);
-        // Sousse
-        CHARGERS.put("CP-SSE-001", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-SSE-002", ChargerStatus.OCCUPIED);
-        CHARGERS.put("CP-SSE-003", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-SSE-004", ChargerStatus.AVAILABLE);
-        // Sfax
-        CHARGERS.put("CP-SFX-001", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-SFX-002", ChargerStatus.FAULTED);
-        CHARGERS.put("CP-SFX-003", ChargerStatus.AVAILABLE);
-        // Nabeul
-        CHARGERS.put("CP-NBL-001", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-NBL-002", ChargerStatus.AVAILABLE);
-        // Hammamet
-        CHARGERS.put("CP-HMT-001", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-HMT-002", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-HMT-003", ChargerStatus.OCCUPIED);
-        CHARGERS.put("CP-HMT-004", ChargerStatus.AVAILABLE);
-        CHARGERS.put("CP-HMT-005", ChargerStatus.AVAILABLE);
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ConnectionData(int quantity) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record StationsFile(List<StationData> stations) {
     }
 
     private final ChargerStationRepository chargerRepository;
@@ -84,8 +55,9 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (chargerRepository.count() == 0) {
-            CHARGERS.forEach((id, status) -> chargerRepository.save(new ChargerStation(id, status)));
-            log.info("Preloaded {} chargers into charger-db", CHARGERS.size());
+            Map<String, ChargerStatus> chargers = chargersFromFile();
+            chargers.forEach((id, status) -> chargerRepository.save(new ChargerStation(id, status)));
+            log.info("Preloaded {} chargers (Open Charge Map stations) into charger-db", chargers.size());
         }
 
         if (badgeRepository.count() == 0) {
@@ -97,5 +69,45 @@ public class DataInitializer implements CommandLineRunner {
 
             log.info("Preloaded default authorized badges into charger-db");
         }
+    }
+
+    /** Une borne par point de charge : CP-(id Open Charge Map)-(numero dans la station, a partir de 1). */
+    static Map<String, ChargerStatus> chargersFromFile() {
+        Map<String, ChargerStatus> chargers = new LinkedHashMap<>();
+        for (StationData station : readStations()) {
+            int index = 0;
+            for (ConnectionData connection : station.connections()) {
+                for (int i = 0; i < connection.quantity(); i++) {
+                    index++;
+                    String id = "CP-" + station.ocmId() + "-" + index;
+                    chargers.put(id, simulatedStatus(id, index));
+                }
+            }
+        }
+        return chargers;
+    }
+
+    private static List<StationData> readStations() {
+        try (InputStream in = new ClassPathResource(STATIONS_FILE).getInputStream()) {
+            return new ObjectMapper().readValue(in, StationsFile.class).stations();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Lecture impossible de " + STATIONS_FILE, e);
+        }
+    }
+
+    /**
+     * Statut simule, deterministe (meme regle dans session-service) : la premiere borne de chaque station
+     * est libre ; pour les autres, le hashCode de l'identifiant donne 6 chances sur 10 d'etre libre,
+     * 3 d'etre occupee et 1 d'etre hors service.
+     */
+    static ChargerStatus simulatedStatus(String chargerId, int index) {
+        if (index == 1) {
+            return ChargerStatus.AVAILABLE;
+        }
+        int bucket = Math.floorMod(chargerId.hashCode(), 10);
+        if (bucket <= 5) {
+            return ChargerStatus.AVAILABLE;
+        }
+        return bucket <= 8 ? ChargerStatus.OCCUPIED : ChargerStatus.FAULTED;
     }
 }

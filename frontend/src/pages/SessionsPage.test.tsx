@@ -9,7 +9,7 @@ const driver = { id: 2, name: 'Dhia Mliki', email: 'dhia@voltpark.tn', badgeId: 
 const pendingSession = {
   id: 'pending-1',
   driverId: 2,
-  chargerId: 'CP-TUN-002',
+  chargerId: 'CP-175672-2',
   status: 'PENDING_START',
   startedAt: '2026-11-25T19:00:00Z',
   totalEnergyKwh: 0,
@@ -17,7 +17,7 @@ const pendingSession = {
 const pastSession = {
   id: 'done-1',
   driverId: 2,
-  chargerId: 'CP-TUN-001',
+  chargerId: 'CP-460375-1',
   status: 'COMPLETED',
   startedAt: '2026-11-24T10:00:00Z',
   totalEnergyKwh: 12.5,
@@ -63,7 +63,7 @@ describe('SessionsPage', () => {
 
     expect(await screen.findByRole('button', { name: /Réessayer le démarrage/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Annuler' })).toBeInTheDocument()
-    expect(screen.getByText(/La borne CP-TUN-002 n’a pas pu être jointe/)).toBeInTheDocument()
+    expect(screen.getByText(/La borne CP-175672-2 n’a pas pu être jointe/)).toBeInTheDocument()
 
     const history = screen.getByRole('region', { name: 'Historique des sessions' })
     expect(within(history).getByText(/12,5 kWh/)).toBeInTheDocument()

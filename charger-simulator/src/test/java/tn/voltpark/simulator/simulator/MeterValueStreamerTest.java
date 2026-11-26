@@ -74,7 +74,7 @@ class MeterValueStreamerTest {
 
     @Test
     void streamsReadingsWithTheGivenSessionIdUntilStopped() throws InterruptedException {
-        manager.start("session-42", "CP-TUN-002");
+        manager.start("session-42", "CP-175672-2");
         Thread.sleep(2500);
 
         manager.stop("session-42");
@@ -83,7 +83,7 @@ class MeterValueStreamerTest {
         assertThat(received).hasSizeGreaterThanOrEqualTo(2);
         assertThat(received).allSatisfy(value -> {
             assertThat(value.getSessionId()).isEqualTo("session-42");
-            assertThat(value.getChargerId()).isEqualTo("CP-TUN-002");
+            assertThat(value.getChargerId()).isEqualTo("CP-175672-2");
         });
         // energie cumulee croissante
         assertThat(received.get(received.size() - 1).getEnergyKwh())

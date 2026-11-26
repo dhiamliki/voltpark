@@ -8,11 +8,11 @@
 #      est creee en PENDING_ENERGY, puis recalculee quand energy-service est revenu.
 #
 # Usage : ./failure.sh
-# Variables : GATEWAY_URL, DEMO_BADGE (TAG-002 par defaut), DEMO_CHARGER (CP-TUN-002 par defaut)
+# Variables : GATEWAY_URL, DEMO_BADGE (TAG-002 par defaut), DEMO_CHARGER (CP-175672-2 par defaut)
 . "$(dirname "$0")/common.sh"
 
 BADGE="${DEMO_BADGE:-TAG-002}"
-CHARGER="${DEMO_CHARGER:-CP-TUN-002}"
+CHARGER="${DEMO_CHARGER:-CP-175672-2}"
 info "Gateway : $GATEWAY_URL"
 
 call GET /drivers

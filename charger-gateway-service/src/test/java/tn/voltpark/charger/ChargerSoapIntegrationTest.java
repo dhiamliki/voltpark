@@ -39,7 +39,7 @@ public class ChargerSoapIntegrationTest {
         chargerRepository.deleteAll();
         badgeRepository.deleteAll();
 
-        chargerRepository.save(new ChargerStation("CP-TUN-001", ChargerStatus.AVAILABLE));
+        chargerRepository.save(new ChargerStation("CP-460375-1", ChargerStatus.AVAILABLE));
         ChargerStation occupied = new ChargerStation("CP-TUN-OCCUPIED", ChargerStatus.OCCUPIED);
         occupied.setCurrentTransactionId(9999);
         occupied.setCurrentIdTag("TAG-OCC");
@@ -53,7 +53,7 @@ public class ChargerSoapIntegrationTest {
     public void testRemoteStartTransaction_Success() {
         String request = """
                 <ns2:RemoteStartTransactionRequest xmlns:ns2="http://voltpark.tn/charger/ws">
-                    <ns2:chargerId>CP-TUN-001</ns2:chargerId>
+                    <ns2:chargerId>CP-460375-1</ns2:chargerId>
                     <ns2:connectorId>1</ns2:connectorId>
                     <ns2:idTag>TAG-001</ns2:idTag>
                 </ns2:RemoteStartTransactionRequest>
@@ -101,7 +101,7 @@ public class ChargerSoapIntegrationTest {
     public void testRemoteStartTransaction_BadgeRefused_SoapFault() {
         String request = """
                 <ns2:RemoteStartTransactionRequest xmlns:ns2="http://voltpark.tn/charger/ws">
-                    <ns2:chargerId>CP-TUN-001</ns2:chargerId>
+                    <ns2:chargerId>CP-460375-1</ns2:chargerId>
                     <ns2:connectorId>1</ns2:connectorId>
                     <ns2:idTag>TAG-BLOCKED</ns2:idTag>
                 </ns2:RemoteStartTransactionRequest>
@@ -117,13 +117,13 @@ public class ChargerSoapIntegrationTest {
     public void testGetChargerStatus() {
         String request = """
                 <ns2:GetChargerStatusRequest xmlns:ns2="http://voltpark.tn/charger/ws">
-                    <ns2:chargerId>CP-TUN-001</ns2:chargerId>
+                    <ns2:chargerId>CP-460375-1</ns2:chargerId>
                 </ns2:GetChargerStatusRequest>
                 """;
 
         client.sendRequest(withPayload(new StringSource(request)))
                 .andExpect(noFault())
-                .andExpect(xpath("//ns2:chargerId", namespaces()).evaluatesTo("CP-TUN-001"))
+                .andExpect(xpath("//ns2:chargerId", namespaces()).evaluatesTo("CP-460375-1"))
                 .andExpect(xpath("//ns2:status", namespaces()).evaluatesTo("AVAILABLE"));
     }
 

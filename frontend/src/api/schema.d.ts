@@ -1042,7 +1042,22 @@ export interface components {
         StationResponse: {
             /** Format: int64 */
             id?: number;
+            /**
+             * @description code stable, derive de l'identifiant Open Charge Map (null pour une station creee par l'API)
+             * @example ST-OCM-460375
+             */
+            code?: string | null;
             name?: string;
+            /**
+             * @description operateur reel d'apres Open Charge Map, null s'il n'est pas connu
+             * @example TotalEnergies (FR)
+             */
+            operator?: string | null;
+            /**
+             * @description corridor autoroutier ("A1"), null hors corridor
+             * @example A1
+             */
+            corridor?: string | null;
             address?: string;
             latitude?: number;
             longitude?: number;
@@ -1053,7 +1068,7 @@ export interface components {
             chargers?: components["schemas"]["ChargerResponse"][];
         };
         ChargerRequest: {
-            /** @example CP-TUN-001 */
+            /** @example CP-460375-1 */
             id: string;
             /**
              * Format: int64
@@ -1069,7 +1084,7 @@ export interface components {
             maxPowerKw?: number;
         };
         ChargerResponse: {
-            /** @example CP-TUN-001 */
+            /** @example CP-460375-1 */
             id?: string;
             /** Format: int64 */
             stationId?: number;
@@ -1078,6 +1093,11 @@ export interface components {
             /** @enum {string} */
             status?: "AVAILABLE" | "OCCUPIED" | "CHARGING" | "FAULTED" | "UNAVAILABLE";
             maxPowerKw?: number;
+            /**
+             * @description connecteur (CCS, CHAdeMO, Type 2)
+             * @example CCS
+             */
+            connectorType?: string | null;
         };
         ReservationRequest: {
             /**
@@ -1085,7 +1105,7 @@ export interface components {
              * @example 1
              */
             driverId: number;
-            /** @example CP-TUN-001 */
+            /** @example CP-460375-1 */
             chargerId: string;
             /**
              * Format: date-time
@@ -1121,7 +1141,7 @@ export interface components {
              * @example 1
              */
             driverId: number;
-            /** @example CP-TUN-001 */
+            /** @example CP-460375-1 */
             chargerId: string;
             /**
              * Format: int64

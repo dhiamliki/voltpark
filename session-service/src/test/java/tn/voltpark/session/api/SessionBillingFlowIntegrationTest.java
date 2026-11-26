@@ -100,7 +100,7 @@ class SessionBillingFlowIntegrationTest {
 
     @Test
     void stopBillsEnergyMeasuredByEnergyService() throws Exception {
-        String sessionId = startSession("CP-TUN-001");
+        String sessionId = startSession("CP-460375-1");
         energy.respondWith(10.0, 4.0, 6.0);
 
         mvc.perform(stop(sessionId))
@@ -112,14 +112,14 @@ class SessionBillingFlowIntegrationTest {
         assertThat(invoice.get("status").asText()).isEqualTo("ISSUED");
         assertThat(invoice.get("peakKwh").decimalValue()).isEqualByComparingTo("4.000");
         assertThat(invoice.get("offPeakKwh").decimalValue()).isEqualByComparingTo("6.000");
-        assertThat(invoice.get("peakEnergyCost").decimalValue()).isEqualByComparingTo("2.200");
-        assertThat(invoice.get("offPeakEnergyCost").decimalValue()).isEqualByComparingTo("2.100");
-        assertThat(invoice.get("totalAmount").decimalValue()).isEqualByComparingTo("4.300");
+        assertThat(invoice.get("peakEnergyCost").decimalValue()).isEqualByComparingTo("2.400");
+        assertThat(invoice.get("offPeakEnergyCost").decimalValue()).isEqualByComparingTo("2.400");
+        assertThat(invoice.get("totalAmount").decimalValue()).isEqualByComparingTo("4.800");
     }
 
     @Test
     void energyServiceDownGivesPendingInvoiceThatCanBeRecalculated() throws Exception {
-        String sessionId = startSession("CP-TUN-002");
+        String sessionId = startSession("CP-175672-2");
         energy.failWith(Status.UNAVAILABLE);
 
         // l'arret reussit quand meme
@@ -141,7 +141,7 @@ class SessionBillingFlowIntegrationTest {
         mvc.perform(post("/api/v1/invoices/{id}/recalculation", invoiceId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ISSUED"))
-                .andExpect(jsonPath("$.totalAmount").value(4.3));
+                .andExpect(jsonPath("$.totalAmount").value(5.76));
 
         // une facture deja emise ne se recalcule pas
         mvc.perform(post("/api/v1/invoices/{id}/recalculation", invoiceId))
@@ -150,7 +150,7 @@ class SessionBillingFlowIntegrationTest {
 
     @Test
     void sessionWithoutReadingsIsBilledZero() throws Exception {
-        String sessionId = startSession("CP-TUN-003");
+        String sessionId = startSession("CP-175672-3");
         energy.failWith(Status.NOT_FOUND);
 
         mvc.perform(stop(sessionId)).andExpect(status().isOk());
@@ -162,7 +162,7 @@ class SessionBillingFlowIntegrationTest {
 
     @Test
     void liveViewRelaysWatchSessionAsServerSentEvents() throws Exception {
-        String sessionId = startSession("CP-TUN-001");
+        String sessionId = startSession("CP-460375-1");
         energy.streamProgress(List.of(progress(1.25, 40), progress(2.5, 42)));
 
         MvcResult result = mvc.perform(get("/api/v1/sessions/{id}/live", sessionId)

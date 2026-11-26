@@ -8,7 +8,7 @@ import jakarta.persistence.*;
 public class Charger {
 
     @Id
-    private String id; // ex: CP-TUN-001
+    private String id; // ex: CP-460375-1
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "station_id", nullable = false)
@@ -24,6 +24,10 @@ public class Charger {
     private ChargerStatus status = ChargerStatus.AVAILABLE;
 
     private Double maxPowerKw;
+
+    /** Connecteur : CCS, CHAdeMO ou Type 2. */
+    @Column(length = 20)
+    private String connectorType;
 
     public Charger() {
     }
@@ -74,6 +78,14 @@ public class Charger {
 
     public void setMaxPowerKw(Double maxPowerKw) {
         this.maxPowerKw = maxPowerKw;
+    }
+
+    public String getConnectorType() {
+        return connectorType;
+    }
+
+    public void setConnectorType(String connectorType) {
+        this.connectorType = connectorType;
     }
 
     public enum ChargerType {

@@ -47,15 +47,15 @@ class ReservationServiceTest {
         Instant tEnd = tStart.plus(1, ChronoUnit.HOURS);
 
         when(driverRepository.existsById(10L)).thenReturn(true);
-        when(chargerRepository.existsById("CP-TUN-001")).thenReturn(true);
-        when(reservationRepository.findOverlappingReservations("CP-TUN-001", tStart, tEnd)).thenReturn(List.of());
+        when(chargerRepository.existsById("CP-460375-1")).thenReturn(true);
+        when(reservationRepository.findOverlappingReservations("CP-460375-1", tStart, tEnd)).thenReturn(List.of());
 
-        Reservation entity = new Reservation(10L, "CP-TUN-001", tStart, tEnd);
+        Reservation entity = new Reservation(10L, "CP-460375-1", tStart, tEnd);
         when(reservationRepository.save(any(Reservation.class))).thenReturn(entity);
 
-        ReservationResponse resp = service.createReservation(new ReservationRequest(10L, "CP-TUN-001", tStart, tEnd));
+        ReservationResponse resp = service.createReservation(new ReservationRequest(10L, "CP-460375-1", tStart, tEnd));
         assertNotNull(resp);
-        assertEquals("CP-TUN-001", resp.chargerId());
+        assertEquals("CP-460375-1", resp.chargerId());
     }
 
     @Test
@@ -64,17 +64,17 @@ class ReservationServiceTest {
         Instant tEnd = tStart.plus(1, ChronoUnit.HOURS);
 
         when(driverRepository.existsById(10L)).thenReturn(true);
-        when(chargerRepository.existsById("CP-TUN-001")).thenReturn(true);
-        when(reservationRepository.findOverlappingReservations("CP-TUN-001", tStart, tEnd))
-                .thenReturn(List.of(new Reservation(99L, "CP-TUN-001", tStart, tEnd)));
+        when(chargerRepository.existsById("CP-460375-1")).thenReturn(true);
+        when(reservationRepository.findOverlappingReservations("CP-460375-1", tStart, tEnd))
+                .thenReturn(List.of(new Reservation(99L, "CP-460375-1", tStart, tEnd)));
 
         assertThrows(ReservationConflictException.class, () ->
-                service.createReservation(new ReservationRequest(10L, "CP-TUN-001", tStart, tEnd)));
+                service.createReservation(new ReservationRequest(10L, "CP-460375-1", tStart, tEnd)));
     }
 
     @Test
     void testCancelReservation() {
-        Reservation r = new Reservation(10L, "CP-TUN-001", Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS));
+        Reservation r = new Reservation(10L, "CP-460375-1", Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS));
         when(reservationRepository.findById(7L)).thenReturn(Optional.of(r));
         when(reservationRepository.save(any())).thenAnswer(a -> a.getArgument(0));
 

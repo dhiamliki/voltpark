@@ -3,12 +3,12 @@
 # -> suivi en direct (SSE) -> arret -> facture.
 #
 # Usage : .\full-flow.ps1 [-LiveSeconds 15]
-# Variables : GATEWAY_URL, DEMO_BADGE (TAG-002 par defaut), DEMO_CHARGER (CP-TUN-001 par defaut)
+# Variables : GATEWAY_URL, DEMO_BADGE (TAG-002 par defaut), DEMO_CHARGER (CP-460375-1 par defaut)
 param([int]$LiveSeconds = 15)
 . "$PSScriptRoot\common.ps1"
 
 $Badge = if ($env:DEMO_BADGE) { $env:DEMO_BADGE } else { "TAG-002" }
-$Charger = if ($env:DEMO_CHARGER) { $env:DEMO_CHARGER } else { "CP-TUN-001" }
+$Charger = if ($env:DEMO_CHARGER) { $env:DEMO_CHARGER } else { "CP-460375-1" }
 Write-Info "Gateway : $GatewayUrl"
 
 Write-Step "1. Choix du conducteur (badge $Badge, autorise par la borne)"

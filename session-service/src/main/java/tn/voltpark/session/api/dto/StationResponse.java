@@ -5,7 +5,10 @@ import java.util.List;
 
 public record StationResponse(
         Long id,
+        String code,
         String name,
+        String operator,
+        String corridor,
         String address,
         Double latitude,
         Double longitude,

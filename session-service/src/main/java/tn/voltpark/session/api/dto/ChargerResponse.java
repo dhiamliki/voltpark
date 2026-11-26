@@ -8,5 +8,6 @@ public record ChargerResponse(
         String stationName,
         Charger.ChargerType chargerType,
         Charger.ChargerStatus status,
-        Double maxPowerKw
+        Double maxPowerKw,
+        String connectorType
 ) {}

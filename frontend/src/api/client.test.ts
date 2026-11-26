@@ -51,12 +51,12 @@ describe('ProblemDetail -> ApiError', () => {
         type: 'https://voltpark.tn/errors/reservation-conflict',
         title: 'Conflit de reservation',
         status: 409,
-        detail: 'La borne CP-TUN-002 est deja reservee sur ce creneau horaire',
+        detail: 'La borne CP-175672-2 est deja reservee sur ce creneau horaire',
       }),
     )
 
     expect(error.status).toBe(409)
-    expect(error.message).toBe('La borne CP-TUN-002 est deja reservee sur ce creneau horaire')
+    expect(error.message).toBe('La borne CP-175672-2 est deja reservee sur ce creneau horaire')
     expect(error.fieldErrors).toEqual({})
   })
 

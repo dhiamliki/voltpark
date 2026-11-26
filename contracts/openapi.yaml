@@ -774,8 +774,23 @@ components:
         id:
           type: integer
           format: int64
+        code:
+          type: string
+          nullable: true
+          description: code stable, derive de l'identifiant Open Charge Map (null pour une station creee par l'API)
+          example: "ST-OCM-460375"
         name:
           type: string
+        operator:
+          type: string
+          nullable: true
+          description: operateur reel d'apres Open Charge Map, null s'il n'est pas connu
+          example: "TotalEnergies (FR)"
+        corridor:
+          type: string
+          nullable: true
+          description: corridor autoroutier ("A1"), null hors corridor
+          example: "A1"
         address:
           type: string
         latitude:
@@ -802,7 +817,7 @@ components:
         id:
           type: string
           maxLength: 50
-          example: "CP-TUN-001"
+          example: "CP-460375-1"
         stationId:
           type: integer
           format: int64
@@ -824,7 +839,7 @@ components:
       properties:
         id:
           type: string
-          example: "CP-TUN-001"
+          example: "CP-460375-1"
         stationId:
           type: integer
           format: int64
@@ -837,6 +852,11 @@ components:
           enum: [AVAILABLE, OCCUPIED, CHARGING, FAULTED, UNAVAILABLE]
         maxPowerKw:
           type: number
+        connectorType:
+          type: string
+          nullable: true
+          description: connecteur (CCS, CHAdeMO, Type 2)
+          example: "CCS"
 
     ReservationRequest:
       type: object
@@ -849,7 +869,7 @@ components:
           example: 1
         chargerId:
           type: string
-          example: "CP-TUN-001"
+          example: "CP-460375-1"
         startTime:
           type: string
           format: date-time
@@ -896,7 +916,7 @@ components:
           example: 1
         chargerId:
           type: string
-          example: "CP-TUN-001"
+          example: "CP-460375-1"
         reservationId:
           type: integer
           format: int64

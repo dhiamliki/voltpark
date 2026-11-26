@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 import tn.voltpark.session.domain.model.Charger;
 
 public record ChargerRequest(
-        @NotBlank(message = "L'identifiant de la borne est obligatoire (ex: CP-TUN-001)")
+        @NotBlank(message = "L'identifiant de la borne est obligatoire (ex: CP-460375-1)")
         @Size(max = 50, message = "L'identifiant de la borne fait au plus 50 caracteres")
         String id,
 

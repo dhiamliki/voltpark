@@ -22,7 +22,7 @@ class ChargerSoapClientTest {
         when(template.marshalSendAndReceive(any())).thenReturn(resp);
 
         ChargerSoapClient client = new ChargerSoapClient(template);
-        ChargerSoapClient.RemoteStartResult res = client.remoteStartTransaction("CP-TUN-001", 1, "TAG-001", null, "session-1");
+        ChargerSoapClient.RemoteStartResult res = client.remoteStartTransaction("CP-460375-1", 1, "TAG-001", null, "session-1");
 
         assertTrue(res.accepted());
         assertEquals(777, res.transactionId());
@@ -35,7 +35,7 @@ class ChargerSoapClientTest {
         ChargerSoapClient client = new ChargerSoapClient(template);
 
         ChargerSoapClient.RemoteStartResult fallback = client.fallbackRemoteStart(
-                "CP-TUN-001", 1, "TAG-001", null, "session-1", new RuntimeException("Timeout"));
+                "CP-460375-1", 1, "TAG-001", null, "session-1", new RuntimeException("Timeout"));
 
         assertFalse(fallback.accepted());
         assertTrue(fallback.fallbackTriggered());

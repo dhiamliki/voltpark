@@ -13,8 +13,19 @@ public class Station {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Code stable de la station, ex: ST-OCM-460375 (identifiant Open Charge Map), null si creee par l'API. */
+    @Column(unique = true, length = 40)
+    private String code;
+
     @Column(nullable = false)
     private String name;
+
+    /** Operateur reel (Open Charge Map), null s'il n'est pas connu. */
+    private String operator;
+
+    /** Corridor autoroutier, ex: "A1", null hors corridor. */
+    @Column(length = 10)
+    private String corridor;
 
     private String address;
 
@@ -63,6 +74,30 @@ public class Station {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+    }
+
+    public String getOperator() {
+        return operator;
+    }
+
+    public void setOperator(String operator) {
+        this.operator = operator;
+    }
+
+    public String getCorridor() {
+        return corridor;
+    }
+
+    public void setCorridor(String corridor) {
+        this.corridor = corridor;
     }
 
     public String getAddress() {

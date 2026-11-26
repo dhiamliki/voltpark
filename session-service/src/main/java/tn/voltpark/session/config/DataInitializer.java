@@ -1,8 +1,11 @@
 package tn.voltpark.session.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +23,9 @@ import tn.voltpark.session.repository.InvoiceRepository;
 import tn.voltpark.session.repository.ReservationRepository;
 import tn.voltpark.session.repository.StationRepository;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -30,26 +36,38 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
  * Donnees de demonstration, inserees seulement si les tables sont vides.
- * Les identifiants des bornes sont les memes que dans charger-gateway-service (DataInitializer).
+ * Stations et bornes : fichier partage data/stations-tn.json (bornes reelles, Open Charge Map),
+ * lu aussi par charger-gateway-service avec les memes regles d'identifiants et de statuts.
+ * Simule : statut des bornes et prix.
  */
 @Component
 public class DataInitializer implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
     private static final ZoneId TUNIS = ZoneId.of("Africa/Tunis");
+    static final String STATIONS_FILE = "data/stations-tn.json";
 
-    /** Borne de demonstration : identifiant, puissance (kW), statut. */
-    private record ChargerSeed(String id, double powerKw, Charger.ChargerStatus status) {
+    /** Station du fichier partage (champs utilises ici). */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record StationData(long ocmId, String name, String address, String town, double latitude, double longitude,
+                       String operator, String corridor, List<ConnectionData> connections) {
     }
 
-    /** Station de demonstration : prix en TND/kWh (base, heures pleines, heures creuses) et TND/min d'occupation. */
-    private record StationSeed(String name, String address, double latitude, double longitude,
-                               String price, String peakPrice, String offPeakPrice, String idleFee,
-                               List<ChargerSeed> chargers) {
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ConnectionData(String type, Double powerKw, int quantity) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record StationsFile(List<StationData> stations) {
+    }
+
+    /** Prix simules en TND/kWh (base, heures pleines, heures creuses) et TND/min d'occupation. */
+    private record Prices(String base, String peak, String offPeak, String idleFee) {
     }
 
     /** Session passee : conducteur (index), borne, il y a N jours, heure de debut, duree, energie, part en heures pleines. */
@@ -57,85 +75,21 @@ public class DataInitializer implements CommandLineRunner {
                                int minutes, String energyKwh, String peakShare, boolean paid) {
     }
 
-    private static final Charger.ChargerStatus AVAILABLE = Charger.ChargerStatus.AVAILABLE;
-    private static final Charger.ChargerStatus OCCUPIED = Charger.ChargerStatus.OCCUPIED;
-    private static final Charger.ChargerStatus FAULTED = Charger.ChargerStatus.FAULTED;
-    private static final Charger.ChargerStatus UNAVAILABLE = Charger.ChargerStatus.UNAVAILABLE;
-
-    // CP-TUN-001/002 (Tunis Centre) et CP-TUN-003 (Lac 2) restent disponibles : tests et scripts de demonstration.
-    private static final List<StationSeed> STATIONS = List.of(
-            new StationSeed("VoltPark Tunis Centre - Avenue Habib Bourguiba", "Avenue Habib Bourguiba, Tunis",
-                    36.8002, 10.1865, "0.450", "0.550", "0.350", "0.100", List.of(
-                    new ChargerSeed("CP-TUN-001", 50.0, AVAILABLE),
-                    new ChargerSeed("CP-TUN-002", 22.0, AVAILABLE),
-                    new ChargerSeed("CP-TUN-004", 22.0, OCCUPIED),
-                    new ChargerSeed("CP-TUN-005", 7.0, AVAILABLE))),
-            new StationSeed("VoltPark Les Berges du Lac 2", "Rue du Lac Biwa, Les Berges du Lac 2, Tunis",
-                    36.8432, 10.2725, "0.500", "0.600", "0.400", "0.120", List.of(
-                    new ChargerSeed("CP-TUN-003", 150.0, AVAILABLE),
-                    new ChargerSeed("CP-TUN-006", 150.0, OCCUPIED),
-                    new ChargerSeed("CP-TUN-007", 50.0, AVAILABLE),
-                    new ChargerSeed("CP-TUN-008", 22.0, AVAILABLE),
-                    new ChargerSeed("CP-TUN-009", 22.0, OCCUPIED),
-                    new ChargerSeed("CP-TUN-010", 7.0, AVAILABLE))),
-            new StationSeed("VoltPark Berges du Lac 1 - Rue du Lac Turkana", "Rue du Lac Turkana, Les Berges du Lac 1, Tunis",
-                    36.8318, 10.2366, "0.480", "0.580", "0.380", "0.100", List.of(
-                    new ChargerSeed("CP-TUN-011", 50.0, AVAILABLE),
-                    new ChargerSeed("CP-TUN-012", 22.0, AVAILABLE),
-                    new ChargerSeed("CP-TUN-013", 22.0, FAULTED))),
-            new StationSeed("VoltPark La Marsa Plage", "Avenue Habib Bourguiba, La Marsa",
-                    36.8784, 10.3247, "0.480", "0.580", "0.380", "0.100", List.of(
-                    new ChargerSeed("CP-TUN-014", 50.0, OCCUPIED),
-                    new ChargerSeed("CP-TUN-015", 22.0, AVAILABLE),
-                    new ChargerSeed("CP-TUN-016", 7.0, AVAILABLE))),
-            new StationSeed("VoltPark Ariana Soghra", "Avenue de l'Environnement, Ariana",
-                    36.8665, 10.1647, "0.420", "0.520", "0.320", "0.080", List.of(
-                    new ChargerSeed("CP-TUN-017", 22.0, AVAILABLE),
-                    new ChargerSeed("CP-TUN-018", 7.0, OCCUPIED))),
-            new StationSeed("VoltPark El Menzah 6", "Avenue Othman Ibn Affan, El Menzah 6, Tunis",
-                    36.8475, 10.1838, "0.440", "0.540", "0.340", "0.090", List.of(
-                    new ChargerSeed("CP-TUN-019", 50.0, AVAILABLE),
-                    new ChargerSeed("CP-TUN-020", 22.0, AVAILABLE),
-                    new ChargerSeed("CP-TUN-021", 22.0, UNAVAILABLE))),
-            new StationSeed("VoltPark Sousse Corniche", "Boulevard Hédi Chaker, Sousse",
-                    35.8335, 10.6400, "0.460", "0.560", "0.360", "0.100", List.of(
-                    new ChargerSeed("CP-SSE-001", 150.0, AVAILABLE),
-                    new ChargerSeed("CP-SSE-002", 50.0, OCCUPIED),
-                    new ChargerSeed("CP-SSE-003", 22.0, AVAILABLE),
-                    new ChargerSeed("CP-SSE-004", 22.0, AVAILABLE))),
-            new StationSeed("VoltPark Sfax Centre", "Avenue Hédi Chaker, Sfax",
-                    34.7406, 10.7603, "0.430", "0.530", "0.330", "0.080", List.of(
-                    new ChargerSeed("CP-SFX-001", 50.0, AVAILABLE),
-                    new ChargerSeed("CP-SFX-002", 22.0, FAULTED),
-                    new ChargerSeed("CP-SFX-003", 22.0, AVAILABLE))),
-            new StationSeed("VoltPark Nabeul Avenue Habib Thameur", "Avenue Habib Thameur, Nabeul",
-                    36.4561, 10.7376, "0.440", "0.540", "0.340", "0.080", List.of(
-                    new ChargerSeed("CP-NBL-001", 22.0, AVAILABLE),
-                    new ChargerSeed("CP-NBL-002", 7.0, AVAILABLE))),
-            new StationSeed("VoltPark Hammamet Yasmine", "Boulevard du 7 Novembre, Yasmine Hammamet",
-                    36.3725, 10.5390, "0.470", "0.570", "0.370", "0.100", List.of(
-                    new ChargerSeed("CP-HMT-001", 150.0, AVAILABLE),
-                    new ChargerSeed("CP-HMT-002", 50.0, AVAILABLE),
-                    new ChargerSeed("CP-HMT-003", 22.0, OCCUPIED),
-                    new ChargerSeed("CP-HMT-004", 22.0, AVAILABLE),
-                    new ChargerSeed("CP-HMT-005", 7.0, AVAILABLE)))
-    );
-
     // conducteurs : index 0 = Rafaa (TAG-001), 1 = Dhia (TAG-002), 2 = Sarra (TAG-003)
     private static final List<HistorySeed> HISTORY = List.of(
-            new HistorySeed(1, "CP-TUN-001", 6, 8, 40, 55, "28.400", "0.90", true),
-            new HistorySeed(1, "CP-TUN-007", 5, 18, 15, 70, "31.200", "0.55", true),
-            new HistorySeed(1, "CP-HMT-001", 4, 11, 5, 30, "46.800", "1.00", true),
-            new HistorySeed(1, "CP-TUN-002", 3, 21, 30, 120, "19.600", "0.00", true),
-            new HistorySeed(1, "CP-TUN-011", 2, 13, 20, 45, "24.300", "1.00", false),
-            new HistorySeed(1, "CP-TUN-019", 1, 7, 10, 60, "22.700", "0.40", false),
-            new HistorySeed(0, "CP-TUN-003", 6, 12, 0, 35, "52.100", "1.00", true),
-            new HistorySeed(0, "CP-SSE-001", 4, 16, 45, 40, "48.900", "1.00", true),
-            new HistorySeed(0, "CP-TUN-015", 2, 20, 30, 90, "17.800", "0.00", false),
-            new HistorySeed(0, "CP-TUN-001", 0, 9, 15, 50, "26.500", "1.00", false),
-            new HistorySeed(2, "CP-TUN-017", 5, 19, 0, 80, "15.300", "0.30", true),
-            new HistorySeed(2, "CP-NBL-001", 3, 10, 30, 75, "18.900", "1.00", true),
-            new HistorySeed(2, "CP-TUN-020", 1, 22, 0, 100, "16.400", "0.00", false)
+            new HistorySeed(1, "CP-460375-1", 6, 8, 40, 55, "28.400", "0.90", true),   // Shell Sidi Khelifa (A1)
+            new HistorySeed(1, "CP-462507-1", 5, 18, 15, 70, "31.200", "0.55", true),  // MG MAXI Marsa
+            new HistorySeed(1, "CP-175675-1", 4, 11, 5, 30, "23.900", "1.00", true),   // TotalEnergies Grombalia (A1)
+            new HistorySeed(1, "CP-175677-1", 3, 21, 30, 120, "12.800", "0.00", true), // TotalEnergies L'Aouina
+            new HistorySeed(1, "CP-460464-1", 2, 13, 20, 45, "24.300", "1.00", false), // BYD Bir El Kassaa
+            new HistorySeed(1, "CP-305758-1", 1, 7, 10, 60, "20.700", "0.40", false),  // Station Agil
+            new HistorySeed(0, "CP-175672-3", 6, 12, 0, 35, "52.100", "1.00", true),   // El Jem (A1)
+            new HistorySeed(0, "CP-175673-3", 4, 16, 45, 40, "31.500", "1.00", true),  // Borjine (A1)
+            new HistorySeed(0, "CP-462507-2", 2, 20, 30, 90, "17.800", "0.00", false), // MG MAXI Marsa
+            new HistorySeed(0, "CP-460463-1", 0, 9, 15, 50, "17.400", "1.00", false),  // Shell Bir El Kassaa (A1)
+            new HistorySeed(2, "CP-175670-1", 5, 19, 0, 80, "15.300", "0.30", true),   // TotalEnergies RN1 Sfax
+            new HistorySeed(2, "CP-189069-1", 3, 10, 30, 75, "18.900", "1.00", true),  // TotalEnergies Sousse
+            new HistorySeed(2, "CP-460271-1", 1, 22, 0, 100, "16.400", "0.00", false)  // Municipalite de Sfax
     );
 
     private final DriverRepository driverRepository;
@@ -175,23 +129,98 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         if (stationRepository.count() == 0) {
-            for (StationSeed seed : STATIONS) {
-                Station station = stationRepository.save(new Station(seed.name(), seed.address(),
-                        seed.latitude(), seed.longitude(),
-                        new BigDecimal(seed.price()), new BigDecimal(seed.peakPrice()),
-                        new BigDecimal(seed.offPeakPrice()), new BigDecimal(seed.idleFee())));
-                for (ChargerSeed charger : seed.chargers()) {
-                    chargerRepository.save(new Charger(charger.id(), station, Charger.ChargerType.SOAP,
-                            charger.status(), charger.powerKw()));
-                }
-            }
-            log.info("Preloaded {} stations and their chargers in session-service", STATIONS.size());
+            seedStations();
         }
 
         if (sessionRepository.count() == 0 && invoiceRepository.count() == 0 && reservationRepository.count() == 0) {
             seedHistory();
             seedUpcomingReservations();
         }
+    }
+
+    /** Stations reelles et leurs bornes : une borne par point de charge (quantite des connecteurs). */
+    private void seedStations() {
+        List<StationData> stations = readStations();
+        int chargerCount = 0;
+        for (StationData data : stations) {
+            Prices prices = pricesFor(data);
+            Station station = new Station(data.name(), addressOf(data), data.latitude(), data.longitude(),
+                    new BigDecimal(prices.base()), new BigDecimal(prices.peak()),
+                    new BigDecimal(prices.offPeak()), new BigDecimal(prices.idleFee()));
+            station.setCode(stationCode(data.ocmId()));
+            station.setOperator(data.operator());
+            station.setCorridor(data.corridor());
+            station = stationRepository.save(station);
+
+            int index = 0;
+            for (ConnectionData connection : data.connections()) {
+                for (int i = 0; i < connection.quantity(); i++) {
+                    index++;
+                    String id = chargerId(data.ocmId(), index);
+                    Charger charger = new Charger(id, station, Charger.ChargerType.SOAP,
+                            simulatedStatus(id, index), connection.powerKw());
+                    charger.setConnectorType(connection.type());
+                    chargerRepository.save(charger);
+                    chargerCount++;
+                }
+            }
+        }
+        log.info("Preloaded {} stations (Open Charge Map) and {} chargers in session-service", stations.size(), chargerCount);
+    }
+
+    static List<StationData> readStations() {
+        try (InputStream in = new ClassPathResource(STATIONS_FILE).getInputStream()) {
+            return new ObjectMapper().readValue(in, StationsFile.class).stations();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Lecture impossible de " + STATIONS_FILE, e);
+        }
+    }
+
+    static String stationCode(long ocmId) {
+        return "ST-OCM-" + ocmId;
+    }
+
+    /** Identifiant de borne : CP-(id Open Charge Map)-(numero dans la station, a partir de 1). */
+    static String chargerId(long ocmId, int index) {
+        return "CP-" + ocmId + "-" + index;
+    }
+
+    /**
+     * Statut simule, deterministe (meme regle dans charger-gateway-service) : la premiere borne de chaque
+     * station est libre ; pour les autres, le hashCode de l'identifiant donne 6 chances sur 10 d'etre libre,
+     * 3 d'etre occupee et 1 d'etre hors service.
+     */
+    static Charger.ChargerStatus simulatedStatus(String chargerId, int index) {
+        if (index == 1) {
+            return Charger.ChargerStatus.AVAILABLE;
+        }
+        int bucket = Math.floorMod(chargerId.hashCode(), 10);
+        if (bucket <= 5) {
+            return Charger.ChargerStatus.AVAILABLE;
+        }
+        return bucket <= 8 ? Charger.ChargerStatus.OCCUPIED : Charger.ChargerStatus.FAULTED;
+    }
+
+    /** Prix simules selon la puissance maximale de la station : normale (jusqu'a 22 kW), rapide (jusqu'a 50 kW), ultra-rapide. */
+    private static Prices pricesFor(StationData data) {
+        double maxPower = data.connections().stream()
+                .map(ConnectionData::powerKw).filter(Objects::nonNull)
+                .mapToDouble(Double::doubleValue).max().orElse(0);
+        if (maxPower <= 22) {
+            return new Prices("0.400", "0.480", "0.320", "0.050");
+        }
+        if (maxPower <= 50) {
+            return new Prices("0.500", "0.600", "0.400", "0.100");
+        }
+        return new Prices("0.600", "0.720", "0.480", "0.150");
+    }
+
+    private static String addressOf(StationData data) {
+        String address = data.address() == null ? "" : data.address();
+        if (data.town() != null && !address.contains(data.town())) {
+            address = address.isEmpty() ? data.town() : address + ", " + data.town();
+        }
+        return address;
     }
 
     /** Sessions terminees et factures des 7 derniers jours (valeurs fixes, dates relatives a aujourd'hui). */
@@ -256,7 +285,8 @@ public class DataInitializer implements CommandLineRunner {
 
     /**
      * Reservations a venir (demain et apres-demain) et une reservation annulee.
-     * Bornes non utilisees par les tests ni par les scripts de demonstration.
+     * Bornes non utilisees par les tests ni par les scripts de demonstration
+     * (CP-460375-1, CP-175672-2 et CP-175672-3).
      */
     private void seedUpcomingReservations() {
         List<Driver> drivers = driverRepository.findAll(Sort.by("id"));
@@ -268,10 +298,10 @@ public class DataInitializer implements CommandLineRunner {
         Instant afterTomorrow = today.plusDays(2).atTime(18, 30).atZone(TUNIS).toInstant();
         Instant yesterday = today.minusDays(1).atTime(17, 0).atZone(TUNIS).toInstant();
 
-        reservationRepository.save(new Reservation(drivers.get(1).getId(), "CP-TUN-007", tomorrow, tomorrow.plus(1, ChronoUnit.HOURS)));
-        reservationRepository.save(new Reservation(drivers.get(0).getId(), "CP-TUN-012", afterTomorrow, afterTomorrow.plus(90, ChronoUnit.MINUTES)));
-        reservationRepository.save(new Reservation(drivers.get(2).getId(), "CP-TUN-020", tomorrow, tomorrow.plus(1, ChronoUnit.HOURS)));
-        Reservation cancelled = new Reservation(drivers.get(1).getId(), "CP-SSE-001", yesterday, yesterday.plus(1, ChronoUnit.HOURS));
+        reservationRepository.save(new Reservation(drivers.get(1).getId(), "CP-175673-3", tomorrow, tomorrow.plus(1, ChronoUnit.HOURS)));
+        reservationRepository.save(new Reservation(drivers.get(0).getId(), "CP-462507-1", afterTomorrow, afterTomorrow.plus(90, ChronoUnit.MINUTES)));
+        reservationRepository.save(new Reservation(drivers.get(2).getId(), "CP-460271-1", tomorrow, tomorrow.plus(1, ChronoUnit.HOURS)));
+        Reservation cancelled = new Reservation(drivers.get(1).getId(), "CP-203502-1", yesterday, yesterday.plus(1, ChronoUnit.HOURS));
         cancelled.setStatus(Reservation.ReservationStatus.CANCELLED);
         reservationRepository.save(cancelled);
         log.info("Preloaded upcoming and cancelled reservations");

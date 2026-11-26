@@ -7,11 +7,11 @@
 #      est creee en PENDING_ENERGY, puis recalculee quand energy-service est revenu.
 #
 # Usage : .\failure.ps1
-# Variables : GATEWAY_URL, DEMO_BADGE (TAG-002 par defaut), DEMO_CHARGER (CP-TUN-002 par defaut)
+# Variables : GATEWAY_URL, DEMO_BADGE (TAG-002 par defaut), DEMO_CHARGER (CP-175672-2 par defaut)
 . "$PSScriptRoot\common.ps1"
 
 $Badge = if ($env:DEMO_BADGE) { $env:DEMO_BADGE } else { "TAG-002" }
-$Charger = if ($env:DEMO_CHARGER) { $env:DEMO_CHARGER } else { "CP-TUN-002" }
+$Charger = if ($env:DEMO_CHARGER) { $env:DEMO_CHARGER } else { "CP-175672-2" }
 Write-Info "Gateway : $GatewayUrl"
 $DriverId = Get-DriverId $Badge
 $BlockedId = Get-DriverId "TAG-BLOCKED"

@@ -56,12 +56,12 @@ class SimulationControllerTest {
     void startsAndStopsSeveralSessionsInParallel() throws Exception {
         fakeStreamWaitingForStop();
 
-        mvc.perform(post("/api/simulations").contentType(MediaType.APPLICATION_JSON).content(body("s-1", "CP-TUN-001")))
+        mvc.perform(post("/api/simulations").contentType(MediaType.APPLICATION_JSON).content(body("s-1", "CP-460375-1")))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "http://localhost/api/simulations/s-1"))
                 .andExpect(jsonPath("$.sessionId").value("s-1"))
-                .andExpect(jsonPath("$.chargerId").value("CP-TUN-001"));
-        mvc.perform(post("/api/simulations").contentType(MediaType.APPLICATION_JSON).content(body("s-2", "CP-TUN-002")))
+                .andExpect(jsonPath("$.chargerId").value("CP-460375-1"));
+        mvc.perform(post("/api/simulations").contentType(MediaType.APPLICATION_JSON).content(body("s-2", "CP-175672-2")))
                 .andExpect(status().isCreated());
 
         mvc.perform(get("/api/simulations"))
@@ -82,10 +82,10 @@ class SimulationControllerTest {
     @Test
     void rejectsSecondStartForSameSession() throws Exception {
         fakeStreamWaitingForStop();
-        mvc.perform(post("/api/simulations").contentType(MediaType.APPLICATION_JSON).content(body("dup", "CP-TUN-001")))
+        mvc.perform(post("/api/simulations").contentType(MediaType.APPLICATION_JSON).content(body("dup", "CP-460375-1")))
                 .andExpect(status().isCreated());
 
-        mvc.perform(post("/api/simulations").contentType(MediaType.APPLICATION_JSON).content(body("dup", "CP-TUN-001")))
+        mvc.perform(post("/api/simulations").contentType(MediaType.APPLICATION_JSON).content(body("dup", "CP-460375-1")))
                 .andExpect(status().isConflict());
 
         mvc.perform(delete("/api/simulations/dup")).andExpect(status().isNoContent());

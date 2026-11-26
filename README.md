@@ -179,7 +179,7 @@ VITE_API_BASE_URL=http://localhost:8080/api/v1 npm run dev     # http://localhos
 
 **Fonds de carte.** Fond clair Esri World Light Gray Canvas (attribution affichée en bas de la carte), sans clé d'API ; CARTO Positron demande désormais une clé. Une autre source peut être choisie au build avec `VITE_MAP_TILES_URL` et `VITE_MAP_TILES_ATTRIBUTION`. Les tuiles demandent un accès à Internet : sans elles, la page affiche la liste des stations. Les épingles trop proches à un niveau de zoom sont écartées en cercle (chaque station garde son épingle).
 
-**Données de démonstration.** Au premier démarrage (bases vides), session-service et charger-gateway-service créent 10 stations (Grand Tunis, Sousse, Sfax, Nabeul, Hammamet) et 35 bornes avec les mêmes identifiants, 4 conducteurs (`TAG-BLOCKED` est refusé par les bornes), des sessions et factures sur les 7 derniers jours et quelques réservations. Pour repartir de ces données : `docker compose down -v`.
+**Données de démonstration.** Les stations sont des bornes **réelles** de Tunisie, issues d'Open Charge Map (licence CC BY 4.0) : 16 stations publiques et opérationnelles, dont 8 sur l'autoroute A1 Tunis - Sfax, et 31 bornes (fichier partagé `data/stations-tn.json`, voir [data/README.md](data/README.md)). La position, l'opérateur et les connecteurs sont réels ; la disponibilité, les prix et l'occupation sont simulés. Au premier démarrage (bases vides), session-service et charger-gateway-service créent ces stations et bornes avec les mêmes identifiants (`ST-OCM-460375`, `CP-460375-1`), 4 conducteurs (`TAG-BLOCKED` est refusé par les bornes), des sessions et factures sur les 7 derniers jours et quelques réservations. Pour repartir de ces données : `docker compose down -v`.
 
 **Captures d'écran** (`docs/screenshots/`) : tableau de bord sans session (`carte.png` en 1920 × 1080, `carte-1440.png`, `carte-mobile.png`) et avec une session en direct (`carte-live.png`, `carte-live-1440.png`, `carte-live-mobile.png`, `mobile-session.png`), `session-live.png`, `sessions.png`, `reservation.png`, `factures.png`, `facture.png`, `pending-start.png`.
 
@@ -259,7 +259,7 @@ Les scripts de `scripts/demo/` passent uniquement par l'API Gateway (comme le fr
 
 1. choix du conducteur au badge `TAG-002` (badge autorisé par la borne) ;
 2. liste des stations et des bornes ;
-3. réservation de la borne `CP-TUN-001` ;
+3. réservation de la borne `CP-460375-1` ;
 4. démarrage de la session : session-service crée la session (UUID) et envoie `RemoteStartTransaction` en SOAP avec cet identifiant ; charger-gateway-service accepte et demande au simulateur de charger ; le simulateur envoie une mesure par seconde à energy-service (gRPC `StreamMeterValues`) ;
 5. suivi en direct pendant 15 s : `GET /api/v1/sessions/{id}/live` (Server-Sent Events, relais de `WatchSession`), une ligne par mesure (puissance, énergie, batterie) ;
 6. arrêt avec `PATCH /api/v1/sessions/{id}` et `{"status":"STOPPED"}` : `RemoteStopTransaction` en SOAP (le simulateur ferme son flux, energy-service clôture la session), puis `GetSessionEnergy` en gRPC ;

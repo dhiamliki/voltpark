@@ -13,7 +13,7 @@ grpc:
 
 simulator:
   enabled: ${SIMULATOR_ENABLED:true}
-  charger-id: ${SIMULATOR_CHARGER_ID:CP-TUN-001}
+  charger-id: ${SIMULATOR_CHARGER_ID:CP-460375-1}
   interval-seconds: ${SIMULATOR_INTERVAL_SECONDS:120}
   duration-seconds: ${SIMULATOR_DURATION_SECONDS:60}
   time-factor: ${SIMULATOR_TIME_FACTOR:60}

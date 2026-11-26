@@ -30,3 +30,21 @@ Le `transactionId` (entier) reste l'identifiant de la transaction cote borne, ut
 dans les echanges SOAP. Les sessions generees automatiquement par le simulateur (mode planifie,
 `SIMULATOR_ENABLED=true`) utilisent des identifiants `SIM-<horodatage>` qui ne correspondent a
 aucune session de `session-service`.
+
+## Fichier partage des stations
+
+L'original est `data/stations-tn.json` (bornes reelles, Open Charge Map, voir `data/README.md`).
+Deux copies servent a initialiser les bases :
+
+- `session-service/src/main/resources/data/stations-tn.json` (stations, bornes, prix simules)
+- `charger-gateway-service/src/main/resources/data/stations-tn.json` (bornes et leur statut)
+
+Toute modification de l'original doit etre recopiee dans les deux copies, dans le meme commit.
+Les deux services en tirent les memes identifiants et les memes statuts simules :
+
+- station : `ST-OCM-<ocmId>` (ex. `ST-OCM-460375`) ;
+- borne : `CP-<ocmId>-<n>`, une par point de charge, numerotees a partir de 1 dans l'ordre des
+  connecteurs du fichier (ex. `CP-460375-1`) ;
+- statut : la borne 1 de chaque station est libre ; les autres suivent `hashCode` de leur
+  identifiant modulo 10 (0-5 libre, 6-8 occupee, 9 hors service). Les deux `DataInitializer`
+  doivent garder la meme regle.

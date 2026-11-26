@@ -120,7 +120,7 @@ class ChargerSoapResilienceTest {
         when(webServiceTemplate.marshalSendAndReceive(any()))
                 .thenThrow(soapFault("BadgeRefusedDetail", "BADGE_REFUSED", "Badge refuse: TAG-BLOCKED"));
 
-        assertThatThrownBy(() -> client.remoteStartTransaction("CP-TUN-001", 1, "TAG-BLOCKED", null, "s-1"))
+        assertThatThrownBy(() -> client.remoteStartTransaction("CP-460375-1", 1, "TAG-BLOCKED", null, "s-1"))
                 .isInstanceOfSatisfying(ChargerFaultException.class, e -> {
                     assertThat(e.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
                     assertThat(e.getErrorCode()).isEqualTo("BADGE_REFUSED");
@@ -152,7 +152,7 @@ class ChargerSoapResilienceTest {
         when(webServiceTemplate.marshalSendAndReceive(any()))
                 .thenThrow(new WebServiceIOException("I/O error: Connection refused", new IOException("Connection refused")));
 
-        ChargerSoapClient.RemoteStartResult result = client.remoteStartTransaction("CP-TUN-001", 1, "TAG-001", null, "s-2");
+        ChargerSoapClient.RemoteStartResult result = client.remoteStartTransaction("CP-460375-1", 1, "TAG-001", null, "s-2");
 
         assertThat(result.fallbackTriggered()).isTrue();
         assertThat(result.message()).contains("PENDING_START");
@@ -165,7 +165,7 @@ class ChargerSoapResilienceTest {
     void openCircuitFallsBackWithoutCallingTheGateway() {
         circuit.transitionToOpenState();
 
-        ChargerSoapClient.RemoteStartResult result = client.remoteStartTransaction("CP-TUN-001", 1, "TAG-001", null, "s-3");
+        ChargerSoapClient.RemoteStartResult result = client.remoteStartTransaction("CP-460375-1", 1, "TAG-001", null, "s-3");
 
         assertThat(result.fallbackTriggered()).isTrue();
         verify(webServiceTemplate, times(0)).marshalSendAndReceive(any());
@@ -181,14 +181,14 @@ class ChargerSoapResilienceTest {
 
         for (int i = 0; i < 3; i++) {
             mvc.perform(post("/api/v1/sessions").contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"driverId\":4,\"chargerId\":\"CP-TUN-001\"}"))
+                            .content("{\"driverId\":4,\"chargerId\":\"CP-460375-1\"}"))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.errorCode").value("BADGE_REFUSED"));
         }
 
         assertThat(sessionRepository.count()).isEqualTo(sessionsBefore);
         assertThat(circuit.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
-        assertThat(chargerRepository.findById("CP-TUN-001").orElseThrow().getStatus())
+        assertThat(chargerRepository.findById("CP-460375-1").orElseThrow().getStatus())
                 .isEqualTo(Charger.ChargerStatus.AVAILABLE);
     }
 
@@ -198,12 +198,12 @@ class ChargerSoapResilienceTest {
                 .thenThrow(new WebServiceIOException("Connection refused"));
 
         String body = mvc.perform(post("/api/v1/sessions").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"driverId\":1,\"chargerId\":\"CP-TUN-002\"}"))
+                        .content("{\"driverId\":1,\"chargerId\":\"CP-175672-2\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING_START"))
                 .andReturn().getResponse().getContentAsString();
         String id = json.readTree(body).get("id").asText();
-        assertThat(chargerRepository.findById("CP-TUN-002").orElseThrow().getStatus())
+        assertThat(chargerRepository.findById("CP-175672-2").orElseThrow().getStatus())
                 .isEqualTo(Charger.ChargerStatus.OCCUPIED);
 
         // passerelle toujours en panne : 502, la session reste en attente
@@ -220,7 +220,7 @@ class ChargerSoapResilienceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.transactionId").value(3001));
-        assertThat(chargerRepository.findById("CP-TUN-002").orElseThrow().getStatus())
+        assertThat(chargerRepository.findById("CP-175672-2").orElseThrow().getStatus())
                 .isEqualTo(Charger.ChargerStatus.CHARGING);
 
         // un nouvel essai sur une session deja demarree : 409
@@ -234,21 +234,21 @@ class ChargerSoapResilienceTest {
         when(webServiceTemplate.marshalSendAndReceive(any()))
                 .thenThrow(new WebServiceIOException("Connection refused"));
         String body = mvc.perform(post("/api/v1/sessions").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"driverId\":1,\"chargerId\":\"CP-TUN-003\"}"))
+                        .content("{\"driverId\":1,\"chargerId\":\"CP-175672-3\"}"))
                 .andExpect(jsonPath("$.status").value("PENDING_START"))
                 .andReturn().getResponse().getContentAsString();
         String id = json.readTree(body).get("id").asText();
 
         // la borne est gardee pour cette session : un autre demarrage est refuse
         mvc.perform(post("/api/v1/sessions").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"driverId\":2,\"chargerId\":\"CP-TUN-003\"}"))
+                        .content("{\"driverId\":2,\"chargerId\":\"CP-175672-3\"}"))
                 .andExpect(status().isConflict());
 
         mvc.perform(patch("/api/v1/sessions/{id}", id).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"STOPPED\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
-        assertThat(chargerRepository.findById("CP-TUN-003").orElseThrow().getStatus())
+        assertThat(chargerRepository.findById("CP-175672-3").orElseThrow().getStatus())
                 .isEqualTo(Charger.ChargerStatus.AVAILABLE);
         // pas de facture pour une session qui n'a jamais demarre
         mvc.perform(get("/api/v1/sessions/{id}/invoice", id)).andExpect(status().isNotFound());
@@ -259,7 +259,7 @@ class ChargerSoapResilienceTest {
         when(webServiceTemplate.marshalSendAndReceive(any()))
                 .thenThrow(new WebServiceIOException("Connection refused"));
         String body = mvc.perform(post("/api/v1/sessions").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"driverId\":2,\"chargerId\":\"CP-TUN-001\"}"))
+                        .content("{\"driverId\":2,\"chargerId\":\"CP-460375-1\"}"))
                 .andReturn().getResponse().getContentAsString();
         String id = json.readTree(body).get("id").asText();
 
@@ -272,7 +272,7 @@ class ChargerSoapResilienceTest {
                 .andExpect(jsonPath("$.errorCode").value("CHARGER_OCCUPIED"));
 
         mvc.perform(get("/api/v1/sessions/{id}", id)).andExpect(jsonPath("$.status").value("FAILED"));
-        assertThat(chargerRepository.findById("CP-TUN-001").orElseThrow().getStatus())
+        assertThat(chargerRepository.findById("CP-460375-1").orElseThrow().getStatus())
                 .isEqualTo(Charger.ChargerStatus.AVAILABLE);
     }
 
@@ -281,14 +281,14 @@ class ChargerSoapResilienceTest {
         when(webServiceTemplate.marshalSendAndReceive(any())).thenReturn(accepted(4001));
         Instant start = Instant.now().plusSeconds(2).truncatedTo(ChronoUnit.SECONDS);
         String reservation = mvc.perform(post("/api/v1/reservations").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"driverId\":2,\"chargerId\":\"CP-TUN-002\",\"startTime\":\"" + start
+                        .content("{\"driverId\":2,\"chargerId\":\"CP-175672-2\",\"startTime\":\"" + start
                                 + "\",\"endTime\":\"" + start.plus(30, ChronoUnit.MINUTES) + "\"}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         long reservationId = json.readTree(reservation).get("id").asLong();
 
         String body = mvc.perform(post("/api/v1/sessions").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"driverId\":2,\"chargerId\":\"CP-TUN-002\",\"reservationId\":" + reservationId + "}"))
+                        .content("{\"driverId\":2,\"chargerId\":\"CP-175672-2\",\"reservationId\":" + reservationId + "}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = json.readTree(body).get("id").asText();
@@ -303,13 +303,13 @@ class ChargerSoapResilienceTest {
     void reservationOfAnotherDriverIsRefused() throws Exception {
         Instant start = Instant.now().plusSeconds(2).truncatedTo(ChronoUnit.SECONDS);
         String reservation = mvc.perform(post("/api/v1/reservations").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"driverId\":1,\"chargerId\":\"CP-TUN-003\",\"startTime\":\"" + start
+                        .content("{\"driverId\":1,\"chargerId\":\"CP-175672-3\",\"startTime\":\"" + start
                                 + "\",\"endTime\":\"" + start.plus(10, ChronoUnit.MINUTES) + "\"}"))
                 .andReturn().getResponse().getContentAsString();
         long reservationId = json.readTree(reservation).get("id").asLong();
 
         mvc.perform(post("/api/v1/sessions").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"driverId\":2,\"chargerId\":\"CP-TUN-003\",\"reservationId\":" + reservationId + "}"))
+                        .content("{\"driverId\":2,\"chargerId\":\"CP-175672-3\",\"reservationId\":" + reservationId + "}"))
                 .andExpect(status().isConflict());
         verify(webServiceTemplate, times(0)).marshalSendAndReceive(any());
     }

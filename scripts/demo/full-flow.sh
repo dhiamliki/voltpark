@@ -4,12 +4,12 @@
 # -> suivi en direct (SSE) -> arret -> facture.
 #
 # Usage : ./full-flow.sh [duree_du_suivi_en_secondes]   (15 par defaut)
-# Variables : GATEWAY_URL, DEMO_BADGE (TAG-002 par defaut), DEMO_CHARGER (CP-TUN-001 par defaut)
+# Variables : GATEWAY_URL, DEMO_BADGE (TAG-002 par defaut), DEMO_CHARGER (CP-460375-1 par defaut)
 . "$(dirname "$0")/common.sh"
 
 LIVE_SECONDS="${1:-15}"
 BADGE="${DEMO_BADGE:-TAG-002}"
-CHARGER="${DEMO_CHARGER:-CP-TUN-001}"
+CHARGER="${DEMO_CHARGER:-CP-460375-1}"
 info "Gateway : $GATEWAY_URL"
 
 step "1. Choix du conducteur (badge $BADGE, autorise par la borne)"
