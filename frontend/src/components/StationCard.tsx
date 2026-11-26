@@ -1,9 +1,10 @@
+import { forwardRef } from 'react'
 import { Link } from 'react-router'
-import { ArrowRight, Building2, EvCharger, Gauge, MapPin, Moon, PlugZap, Sun } from 'lucide-react'
+import { Building2, CalendarPlus, EvCharger, Gauge, MapPin, Moon, Play, PlugZap, Sun } from 'lucide-react'
 import type { Charger, Station } from '../api/voltpark'
 import { connectorOf, formatKw, formatMoney, shortName } from '../lib/format'
 import { isOnA1 } from '../lib/regions'
-import { CHARGER_LABELS, chargerPillTone, maxPower, stationCounts } from '../lib/status'
+import { CHARGER_LABELS, maxPower, stationCounts } from '../lib/status'
 import { ICON_STROKE, Pill, StatusDot } from './ui'
 
 /** Bornes dans l'ordre de leur numero (CP-460375-1, CP-460375-2...). */
@@ -25,16 +26,31 @@ function connectorSummary(station: Station) {
   return [...groups.values()]
 }
 
+/** Pourquoi une borne ne peut pas charger maintenant. */
+function unavailableReason(charger: Charger): string {
+  if (charger.status === 'OCCUPIED' || charger.status === 'CHARGING') return 'Occupée : un véhicule charge'
+  if (charger.status === 'FAULTED') return 'Hors service : en panne'
+  return 'Hors service'
+}
+
 /**
- * Fiche station : en-tete compact (illustration, corridor, tarifs, puissance max), adresse,
- * operateur et connecteurs reels (Open Charge Map), compteurs et liste des bornes, bouton de
- * reservation. Disponibilite et prix sont simules.
+ * Fiche station : corridor, tarifs, puissance max, adresse, operateur et connecteurs reels
+ * (Open Charge Map), puis la liste des bornes. Chaque borne libre a son bouton "Charger maintenant" ;
+ * les autres sont grisees avec la raison. "Reserver pour plus tard" est un lien secondaire.
  */
-export function StationCard({ station, distance }: { station: Station; distance?: number | null }) {
+export const StationCard = forwardRef<HTMLElement, {
+  station: Station
+  distance?: number | null
+  onChargeNow: (charger: Charger) => void
+  /** le conducteur a deja une charge en cours : pas de second demarrage */
+  charging?: boolean
+  /** borne de la charge en cours du conducteur (affichee "Votre charge") */
+  myChargerId?: string
+}>(function StationCard({ station, distance, onChargeNow, charging = false, myChargerId }, ref) {
   const counts = stationCounts(station)
   const onA1 = isOnA1(station)
   return (
-    <article className="card station-card" aria-label={station.name}>
+    <article className="card station-card" aria-labelledby={`station-${station.id}`} ref={ref} tabIndex={-1}>
       <div className="station-card__head">
         <span className="station-card__icon" aria-hidden>
           <EvCharger size={40} strokeWidth={1.4} />
@@ -59,7 +75,7 @@ export function StationCard({ station, distance }: { station: Station; distance?
 
       <div className="station-card__body">
         <div className="station-card__heading">
-          <h2>{shortName(station.name)}</h2>
+          <h2 id={`station-${station.id}`}>{shortName(station.name)}</h2>
           {onA1 && (
             <span className="station-card__pill-inline">
               <Pill tone="accent">Autoroute A1</Pill>
@@ -88,46 +104,69 @@ export function StationCard({ station, distance }: { station: Station; distance?
           ))}
         </ul>
 
-        <dl className="stats">
-          <div className="stats__item stats__item--total">
-            <dt>Total</dt>
-            <dd className="stats__value">
-              <PlugZap size={18} strokeWidth={ICON_STROKE} aria-hidden />
-              <span className="tabular">{counts.total}</span>
-            </dd>
-          </div>
-          <div className="stats__item">
-            <dt>Disponibles</dt>
-            <dd className="stats__value">
-              <StatusDot tone="available" />
-              <span className="tabular">{counts.available}</span>
-            </dd>
-          </div>
-          <div className="stats__item">
-            <dt>Occupées</dt>
-            <dd className="stats__value">
-              <StatusDot tone="occupied" />
-              <span className="tabular">{counts.occupied}</span>
-            </dd>
-          </div>
-        </dl>
+        <p className="station-card__count">
+          <StatusDot tone={counts.available > 0 ? 'available' : 'occupied'} />
+          <span className="tabular">
+            {counts.available} borne{counts.available > 1 ? 's' : ''} disponible{counts.available > 1 ? 's' : ''} sur {counts.total}
+          </span>
+        </p>
 
-        <ul className="charger-list" aria-label="Bornes de la station">
-          {sortedChargers(station).map((charger) => (
-            <li key={charger.id} className="charger-list__item">
-              <span className="charger-list__id">{charger.id}</span>
-              <span className="muted tabular">{formatKw(charger.maxPowerKw)} kW</span>
-              <span className="muted">{connectorName(charger)}</span>
-              <Pill tone={chargerPillTone(charger.status)}>{CHARGER_LABELS[charger.status ?? ''] ?? charger.status}</Pill>
-            </li>
-          ))}
+        <ul className="charger-rows" aria-label="Bornes de la station">
+          {sortedChargers(station).map((charger) => {
+            const available = charger.status === 'AVAILABLE'
+            if (charger.id === myChargerId) {
+              return (
+                <li key={charger.id} className="charger-row charger-row--mine">
+                  <span className="charger-row__info">
+                    <strong>
+                      {connectorName(charger)} · <span className="tabular">{formatKw(charger.maxPowerKw)} kW</span>
+                    </strong>
+                    <span className="muted">{charger.id} · votre charge en cours</span>
+                  </span>
+                  <Link to="/charge" className="btn btn--ghost btn--small">
+                    Voir ma charge
+                  </Link>
+                </li>
+              )
+            }
+            return (
+              <li key={charger.id} className={`charger-row ${available ? '' : 'is-unavailable'}`}>
+                <span className="charger-row__info">
+                  <strong>
+                    {connectorName(charger)} · <span className="tabular">{formatKw(charger.maxPowerKw)} kW</span>
+                  </strong>
+                  <span className="muted">
+                    {charger.id}
+                    {!available && <> · {unavailableReason(charger)}</>}
+                  </span>
+                </span>
+                {available ? (
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--small charger-row__go"
+                    onClick={() => onChargeNow(charger)}
+                    disabled={charging}
+                    title={charging ? 'Vous avez déjà une charge en cours' : undefined}
+                    aria-label={`Charger maintenant sur la borne ${charger.id}`}
+                  >
+                    <Play size={14} strokeWidth={ICON_STROKE} fill="currentColor" aria-hidden /> Charger maintenant
+                  </button>
+                ) : (
+                  <Pill tone={charger.status === 'OCCUPIED' || charger.status === 'CHARGING' ? 'neutral' : 'danger'}>
+                    {CHARGER_LABELS[charger.status ?? ''] ?? charger.status}
+                  </Pill>
+                )}
+              </li>
+            )
+          })}
         </ul>
+        {charging && <p className="muted station-card__hint">Une charge est déjà en cours : arrêtez-la pour en démarrer une autre.</p>}
 
-        <Link to={`/reservations?station=${station.id}`} className="btn btn--primary btn--block station-card__cta">
-          Réserver une borne <ArrowRight size={16} strokeWidth={ICON_STROKE} />
+        <Link to={`/reservations?station=${station.id}`} className="link-button station-card__later">
+          <CalendarPlus size={16} strokeWidth={ICON_STROKE} aria-hidden /> Réserver pour plus tard
         </Link>
         <p className="station-card__note">Localisation réelle · disponibilité simulée</p>
       </div>
     </article>
   )
-}
+})

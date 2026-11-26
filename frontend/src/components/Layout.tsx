@@ -1,25 +1,22 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
-import { CalendarDays, FileText, Map as MapIcon, Menu, Search, Settings, User, UserRound, Users, X, Zap } from 'lucide-react'
+import { CalendarDays, History, Map as MapIcon, Menu, Search, Settings, Users, X, Zap } from 'lucide-react'
+import { pageMeta } from '../lib/pages'
+import { useCharge } from '../state/ChargeContext'
 import { useDriver } from '../state/DriverContext'
 import { useSearch } from '../state/SearchContext'
-import { formatLongDay } from '../lib/format'
+import { WelcomePage } from '../pages/WelcomePage'
+import { ChargeBar } from './ChargeBar'
 import { DriverMenu } from './DriverMenu'
 import { NotificationBell } from './NotificationBell'
 import { ICON_STROKE } from './ui'
 
+/** Le parcours principal : trouver une borne, charger, puis retrouver ses reservations et factures. */
 const NAV = [
-  { to: '/', label: 'Carte', icon: MapIcon, end: true },
-  { to: '/sessions', label: 'Mes sessions', icon: Zap },
-  { to: '/reservations', label: 'Réservations', icon: CalendarDays },
-  { to: '/factures', label: 'Factures', icon: FileText },
-]
-
-const TABS = [
-  { to: '/', label: 'Carte', icon: MapIcon, end: true },
-  { to: '/sessions', label: 'Sessions', icon: Zap },
-  { to: '/factures', label: 'Factures', icon: FileText },
-  { to: '/parametres', label: 'Profil', icon: User },
+  { to: '/', label: 'Carte', short: 'Carte', icon: MapIcon, end: true },
+  { to: '/charge', label: 'Ma charge', short: 'Ma charge', icon: Zap },
+  { to: '/reservations', label: 'Réservations', short: 'Réserver', icon: CalendarDays },
+  { to: '/historique', label: 'Historique et factures', short: 'Historique', icon: History },
 ]
 
 export function Logo({ dark = false }: { dark?: boolean }) {
@@ -31,9 +28,19 @@ export function Logo({ dark = false }: { dark?: boolean }) {
   )
 }
 
+/** Point vert sur "Ma charge" pendant une charge. */
+function ChargingDot() {
+  const { current } = useCharge()
+  if (!current) return null
+  return (
+    <span
+      className={`nav-dot ${current.status === 'PENDING_START' ? 'nav-dot--pending' : ''}`}
+      aria-label={current.status === 'ACTIVE' ? 'charge en cours' : 'démarrage en attente'}
+    />
+  )
+}
+
 function Sidebar() {
-  const { selectDriver } = useDriver()
-  const navigate = useNavigate()
   return (
     <aside className="sidebar">
       <Logo dark />
@@ -42,6 +49,7 @@ function Sidebar() {
           <NavLink key={to} to={to} end={end} className="nav-item">
             <Icon size={18} strokeWidth={ICON_STROKE} aria-hidden />
             <span>{label}</span>
+            {to === '/charge' && <ChargingDot />}
           </NavLink>
         ))}
       </nav>
@@ -50,17 +58,6 @@ function Sidebar() {
           <Settings size={18} strokeWidth={ICON_STROKE} aria-hidden />
           <span>Paramètres</span>
         </NavLink>
-        <button
-          type="button"
-          className="nav-item"
-          onClick={() => {
-            selectDriver(null)
-            navigate('/parametres')
-          }}
-        >
-          <Users size={18} strokeWidth={ICON_STROKE} aria-hidden />
-          <span>Changer de conducteur</span>
-        </button>
       </div>
     </aside>
   )
@@ -87,28 +84,14 @@ function SearchField() {
   )
 }
 
-const TITLES: Array<[RegExp, string]> = [
-  [/^\/$/, 'Carte'],
-  [/^\/sessions/, 'Mes sessions'],
-  [/^\/reservations/, 'Réservations'],
-  [/^\/factures\/.+/, 'Facture'],
-  [/^\/factures/, 'Factures'],
-  [/^\/parametres/, 'Paramètres'],
-]
-
-/** Titre de la page et salutation (prenom du conducteur et date du jour). */
+/** Titre de la page et, en une ligne, a quoi elle sert. */
 function PageTitle() {
   const { pathname } = useLocation()
-  const { driver } = useDriver()
-  const title = TITLES.find(([pattern]) => pattern.test(pathname))?.[1] ?? 'VoltPark'
-  const firstName = driver?.name?.split(' ')[0]
-  const [today] = useState(() => formatLongDay(new Date()))
+  const meta = pageMeta(pathname)
   return (
     <div className="topbar__title">
-      <h1>{title}</h1>
-      <p className="muted">
-        {firstName ? `Bonjour, ${firstName}` : 'Bienvenue sur VoltPark'} · <span className="topbar__date">{today}</span>
-      </p>
+      <h1>{meta.title}</h1>
+      <p className="muted">{meta.subtitle}</p>
     </div>
   )
 }
@@ -129,6 +112,7 @@ function TopBar() {
 /** Mobile : logo + menu en haut, onglets en bas. */
 function MobileHeader() {
   const [open, setOpen] = useState(false)
+  const { selectDriver } = useDriver()
   const close = () => setOpen(false)
   return (
     <header className="mobile-header">
@@ -147,9 +131,20 @@ function MobileHeader() {
               </NavLink>
             ))}
             <NavLink to="/parametres" className="mobile-menu__item" onClick={close}>
-              <UserRound size={18} strokeWidth={ICON_STROKE} aria-hidden />
-              Conducteur et paramètres
+              <Settings size={18} strokeWidth={ICON_STROKE} aria-hidden />
+              Paramètres
             </NavLink>
+            <button
+              type="button"
+              className="mobile-menu__item"
+              onClick={() => {
+                close()
+                selectDriver(null)
+              }}
+            >
+              <Users size={18} strokeWidth={ICON_STROKE} aria-hidden />
+              Changer de compte
+            </button>
           </nav>
         </div>
       )}
@@ -160,10 +155,13 @@ function MobileHeader() {
 function TabBar() {
   return (
     <nav className="tabbar" aria-label="Onglets">
-      {TABS.map(({ to, label, icon: Icon, end }) => (
+      {NAV.map(({ to, short, icon: Icon, end }) => (
         <NavLink key={to} to={to} end={end} className="tabbar__item">
-          <Icon size={22} strokeWidth={ICON_STROKE} aria-hidden />
-          <span>{label}</span>
+          <span className="tabbar__icon">
+            <Icon size={22} strokeWidth={ICON_STROKE} aria-hidden />
+            {to === '/charge' && <ChargingDot />}
+          </span>
+          <span>{short}</span>
         </NavLink>
       ))}
     </nav>
@@ -171,12 +169,18 @@ function TabBar() {
 }
 
 export function Layout() {
+  const { driver, selectedId, loading } = useDriver()
+  const { current } = useCharge()
+  // pas de compte choisi (ou compte disparu) : ecran d'accueil
+  if (selectedId == null || (!loading && !driver)) return <WelcomePage />
+
   return (
-    <div className="app">
+    <div className={`app ${current ? 'app--charging' : ''}`}>
       <Sidebar />
       <div className="app__main">
         <TopBar />
         <MobileHeader />
+        <ChargeBar />
         <main className="content">
           <Outlet />
         </main>

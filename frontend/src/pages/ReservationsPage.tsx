@@ -1,14 +1,17 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
-import { CalendarCheck, CalendarClock, CalendarPlus, CalendarX, Play, X, Zap } from 'lucide-react'
+import { CalendarCheck, CalendarClock, CalendarPlus, CalendarX, Hourglass, Play, X, Zap } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { voltpark, type Reservation, type Station } from '../api/voltpark'
 import { StartErrorBanner, RequireDriver } from '../components/sessionParts'
 import { Banner, CardSkeleton, EmptyState, ErrorBanner, ICON_STROKE, Metric, MetricStrip, PageHeader, Pill, StatusDot } from '../components/ui'
 import { formatDateTime, formatTime, shortName } from '../lib/format'
+import { pageMeta } from '../lib/pages'
+import { formatCountdown } from '../lib/simulation'
 import { CHARGER_LABELS, chargerTone, RESERVATION_LABELS } from '../lib/status'
-import { useLoad } from '../lib/useLoad'
 import { useStartSession } from '../lib/useStartSession'
+import { canStartReservation } from '../lib/reservations'
+import { useCharge } from '../state/ChargeContext'
 
 const DURATIONS = [
   { minutes: 30, label: '30 min' },
@@ -73,14 +76,15 @@ function ReservationForm({ driverId, stations, onCreated }: { driverId: number; 
   }
 
   return (
-    <form className="card card--padded form" onSubmit={submit} noValidate aria-label="Nouvelle réservation">
+    <form className="card card--padded form" onSubmit={submit} noValidate aria-label="Réserver pour plus tard">
       <h2 className="card__title">
-        <CalendarPlus size={20} strokeWidth={ICON_STROKE} aria-hidden /> Nouvelle réservation
+        <CalendarPlus size={20} strokeWidth={ICON_STROKE} aria-hidden /> Réserver pour plus tard
       </h2>
+      <p className="muted form__intro">Pour charger tout de suite, pas besoin de réserver : « Charger maintenant » depuis la carte.</p>
       {error && Object.keys(error.fieldErrors).length === 0 && <ErrorBanner error={error} title="Réservation impossible" />}
       {created && (
         <Banner title="Réservation confirmée">
-          {created.chargerId}, le {formatDateTime(created.startTime)} jusqu’à {formatTime(created.endTime)}. Démarrez la charge depuis « Mes réservations ».
+          {created.chargerId}, le {formatDateTime(created.startTime)} jusqu’à {formatTime(created.endTime)}. « Démarrer » apparaîtra 15 min avant le créneau, ici et sur la carte.
         </Banner>
       )}
 
@@ -167,7 +171,12 @@ function ReservationTable({ reservations, stations, onChange }: {
   stations: Station[]
   onChange: () => void
 }) {
-  const { start, startingId, error: startError } = useStartSession()
+  const { start, busyKey, error: startError } = useStartSession()
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 15_000)
+    return () => clearInterval(timer)
+  }, [])
   const [cancelError, setCancelError] = useState<ApiError | null>(null)
   const [cancellingId, setCancellingId] = useState<number | null>(null)
   const [showAll, setShowAll] = useState(false)
@@ -243,11 +252,29 @@ function ReservationTable({ reservations, stations, onChange }: {
                   <td className="num">
                     {r.status === 'CONFIRMED' && (
                       <div className="row__actions row__actions--end">
-                        <button type="button" className="btn btn--primary btn--small" onClick={() => start(r)} disabled={startingId !== null}>
-                          <Play size={14} strokeWidth={ICON_STROKE} fill="currentColor" aria-hidden />
-                          {startingId === r.id ? 'Démarrage…' : 'Démarrer la charge'}
-                        </button>
-                        <button type="button" className="btn btn--ghost btn--small" onClick={() => cancel(r)} disabled={cancellingId !== null}>
+                        {canStartReservation(r, now) ? (
+                          <button
+                            type="button"
+                            className="btn btn--primary btn--small"
+                            onClick={() => start(r.chargerId ?? '', r.id)}
+                            disabled={busyKey !== null}
+                          >
+                            <Play size={14} strokeWidth={ICON_STROKE} fill="currentColor" aria-hidden />
+                            {busyKey === `reservation-${r.id}` ? 'Démarrage…' : 'Démarrer'}
+                          </button>
+                        ) : (
+                          <span className="muted row__wait" title="Démarrage possible 15 min avant le créneau">
+                            <Hourglass size={14} strokeWidth={ICON_STROKE} aria-hidden />{' '}
+                            {new Date(r.startTime ?? 0).getTime() > now ? formatCountdown(new Date(r.startTime ?? 0).getTime() - now) : 'créneau passé'}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--small"
+                          onClick={() => cancel(r)}
+                          disabled={cancellingId !== null}
+                          aria-label={`Annuler la réservation de ${r.chargerId} du ${formatDateTime(r.startTime)}`}
+                        >
                           <X size={14} strokeWidth={ICON_STROKE} aria-hidden />
                           {cancellingId === r.id ? 'Annulation…' : 'Annuler'}
                         </button>
@@ -282,18 +309,15 @@ function ReservationSummary({ reservations }: { reservations: Reservation[] }) {
 export function ReservationsPage() {
   return (
     <>
-      <PageHeader title="Réservations" subtitle="Réservez une borne, puis démarrez la charge à votre arrivée." />
+      <PageHeader title={pageMeta('/reservations').title} subtitle={pageMeta('/reservations').subtitle} />
       <RequireDriver>{(driverId) => <ReservationsContent driverId={driverId} />}</RequireDriver>
     </>
   )
 }
 
 function ReservationsContent({ driverId }: { driverId: number }) {
-  const stations = useLoad((signal) => voltpark.stations(signal), 'stations')
-  const reservations = useLoad(() => voltpark.reservations(driverId), `reservations-${driverId}`)
-
-  if (stations.error) return <ErrorBanner error={stations.error} title="Impossible de charger les stations" />
-  if (!stations.data) {
+  const { stations, reservations, loaded, refresh } = useCharge()
+  if (!loaded) {
     return (
       <div className="two-columns">
         <CardSkeleton lines={6} />
@@ -301,25 +325,20 @@ function ReservationsContent({ driverId }: { driverId: number }) {
       </div>
     )
   }
+  if (stations.length === 0) {
+    return (
+      <Banner tone="danger" title="Impossible de charger les stations">
+        Vérifiez que la plateforme est démarrée, puis rechargez la page.
+      </Banner>
+    )
+  }
+  const onChange = () => void refresh()
   return (
     <div className="stack">
-      <ReservationSummary reservations={reservations.data ?? []} />
+      <ReservationSummary reservations={reservations} />
       <div className="two-columns two-columns--form">
-        <ReservationForm driverId={driverId} stations={stations.data} onCreated={reservations.reload} />
-        {reservations.error ? (
-          <ErrorBanner error={reservations.error} title="Impossible de charger vos réservations" />
-        ) : !reservations.data ? (
-          <CardSkeleton lines={4} />
-        ) : (
-          <ReservationTable
-            reservations={reservations.data}
-            stations={stations.data}
-            onChange={() => {
-              reservations.reload()
-              stations.reload()
-            }}
-          />
-        )}
+        <ReservationForm driverId={driverId} stations={stations} onCreated={onChange} />
+        <ReservationTable reservations={reservations} stations={stations} onChange={onChange} />
       </div>
     </div>
   )

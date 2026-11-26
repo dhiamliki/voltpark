@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { AlertCircle, Info } from 'lucide-react'
+import { Link } from 'react-router'
+import { AlertCircle, ChevronRight, Info } from 'lucide-react'
 import type { ApiError } from '../api/client'
 
 export const ICON_STROKE = 1.75
@@ -119,4 +120,20 @@ export function Metric({ icon, label, value, unit, hint }: {
 
 export function MetricStrip({ children }: { children: ReactNode }) {
   return <section className="metric-strip">{children}</section>
+}
+
+/** Fil d'Ariane des pages de detail, ex. Historique et factures > Facture n° 12. */
+export function Breadcrumbs({ items }: { items: Array<{ label: string; to?: string }> }) {
+  return (
+    <nav className="breadcrumbs" aria-label="Fil d’Ariane">
+      <ol>
+        {items.map((item, index) => (
+          <li key={item.label}>
+            {index > 0 && <ChevronRight size={14} strokeWidth={ICON_STROKE} aria-hidden />}
+            {item.to ? <Link to={item.to}>{item.label}</Link> : <span aria-current="page">{item.label}</span>}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )
 }

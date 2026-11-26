@@ -8,3 +8,12 @@ afterEach(() => {
   vi.restoreAllMocks()
   localStorage.clear()
 })
+
+// jsdom n'a pas ResizeObserver (utilise par la carte Leaflet)
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}

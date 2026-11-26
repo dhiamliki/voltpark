@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft, CheckCircle2, ChevronRight, Clock3, FileText, Hourglass, MapPin, RotateCw, Wallet, Zap } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Clock3, FileText, Hourglass, MapPin, RotateCw, Wallet, Zap } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { voltpark, type Invoice, type Session } from '../api/voltpark'
-import { RequireDriver } from '../components/sessionParts'
-import { Banner, CardSkeleton, EmptyState, ErrorBanner, ICON_STROKE, Metric, MetricStrip, PageHeader, Pill } from '../components/ui'
+import { Banner, Breadcrumbs, CardSkeleton, EmptyState, ErrorBanner, ICON_STROKE, Metric, MetricStrip, Pill } from '../components/ui'
 import { formatDateTime, formatDuration, formatKwh, formatMoney, shortName } from '../lib/format'
 import { durationSeconds, monthSummary } from '../lib/stats'
 import { INVOICE_LABELS, invoiceTone } from '../lib/status'
@@ -25,7 +24,8 @@ function InvoiceSummary({ invoices, sessions }: { invoices: Invoice[]; sessions:
   )
 }
 
-function InvoiceList({ driverId }: { driverId: number }) {
+/** Onglet Factures de "Historique et factures". */
+export function InvoicesTab({ driverId }: { driverId: number }) {
   const navigate = useNavigate()
   const { data, error, reload } = useLoad(() => voltpark.invoices(driverId), `invoices-${driverId}`)
   const sessions = useLoad(() => voltpark.sessions(driverId), `sessions-${driverId}`)
@@ -47,8 +47,8 @@ function InvoiceList({ driverId }: { driverId: number }) {
           title="Aucune facture pour l’instant"
           text="Une facture est créée à la fin de chaque charge."
           action={
-            <Link to="/sessions" className="btn btn--primary">
-              Voir mes sessions
+            <Link to="/" className="btn btn--primary">
+              Trouver une borne
             </Link>
           }
         />
@@ -103,15 +103,6 @@ function InvoiceList({ driverId }: { driverId: number }) {
         </div>
       </section>
     </div>
-  )
-}
-
-export function InvoicesPage() {
-  return (
-    <>
-      <PageHeader title="Factures" subtitle="Le détail de chaque charge : énergie, tarifs et frais d’occupation." />
-      <RequireDriver>{(driverId) => <InvoiceList driverId={driverId} />}</RequireDriver>
-    </>
   )
 }
 
@@ -264,8 +255,8 @@ function InvoiceSession({ sessionId }: { sessionId?: string }) {
           <span>Heures creuses {100 - peakShare} %</span>
         </p>
       </div>
-      <Link to="/sessions" className="btn btn--ghost btn--block">
-        Mes sessions
+      <Link to="/historique" className="btn btn--ghost btn--block">
+        Historique des charges
       </Link>
     </aside>
   )
@@ -280,9 +271,12 @@ export function InvoiceDetailPage() {
 
   return (
     <>
-      <Link to="/factures" className="back-link">
-        <ArrowLeft size={16} strokeWidth={ICON_STROKE} aria-hidden /> Factures
-      </Link>
+      <Breadcrumbs
+        items={[
+          { label: 'Historique et factures', to: '/historique?onglet=factures' },
+          { label: `Facture n° ${invoiceId}` },
+        ]}
+      />
       {error ? (
         <ErrorBanner error={error} title="Facture introuvable" />
       ) : !invoice ? (

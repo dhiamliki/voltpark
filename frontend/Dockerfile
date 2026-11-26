@@ -7,6 +7,9 @@ COPY . .
 # URL de l'API (gateway) vue par le navigateur, figee au moment du build
 ARG VITE_API_BASE_URL=http://localhost:8080/api/v1
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+# acceleration du simulateur de bornes (SIMULATOR_TIME_FACTOR), pour afficher la duree en temps simule
+ARG VITE_SIMULATION_FACTOR=60
+ENV VITE_SIMULATION_FACTOR=$VITE_SIMULATION_FACTOR
 RUN npm run build
 
 FROM nginx:alpine

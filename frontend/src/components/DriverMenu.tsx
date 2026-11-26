@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, UserPlus } from 'lucide-react'
+import { Link } from 'react-router'
+import { History, Settings, Users } from 'lucide-react'
 import { initials } from '../lib/format'
 import { useDriver } from '../state/DriverContext'
-import { DriverForm } from './DriverForm'
 import { ICON_STROKE } from './ui'
 
-/** Avatar du conducteur (initiales) et menu pour choisir ou creer un conducteur. */
+/** Avatar du compte (initiales) : nom et badge, Historique, Parametres et "Changer de compte". */
 export function DriverMenu() {
-  const { drivers, driver, selectDriver } = useDriver()
+  const { driver, selectDriver } = useDriver()
   const [open, setOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -33,52 +32,37 @@ export function DriverMenu() {
         className="avatar"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={driver ? `Conducteur : ${driver.name}` : 'Choisir un conducteur'}
-        onClick={() => {
-          setOpen((o) => !o)
-          setCreating(false)
-        }}
+        aria-label={driver ? `Compte : ${driver.name}` : 'Compte'}
+        onClick={() => setOpen((o) => !o)}
       >
         {initials(driver?.name)}
       </button>
       {open && (
         <div className="popover driver-menu__panel" role="menu">
-          {creating ? (
-            <>
-              <p className="popover__title">Nouveau conducteur</p>
-              <DriverForm onCreated={() => setOpen(false)} onCancel={() => setCreating(false)} />
-            </>
-          ) : (
-            <>
-              <p className="popover__title">Conducteur</p>
-              <ul className="driver-list">
-                {drivers.map((d) => (
-                  <li key={d.id}>
-                    <button
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={d.id === driver?.id}
-                      className="driver-list__item"
-                      onClick={() => {
-                        selectDriver(d.id ?? null)
-                        setOpen(false)
-                      }}
-                    >
-                      <span className="avatar avatar--small">{initials(d.name)}</span>
-                      <span className="driver-list__text">
-                        <span>{d.name}</span>
-                        <span className="muted">{d.badgeId}</span>
-                      </span>
-                      {d.id === driver?.id && <Check size={16} strokeWidth={ICON_STROKE} />}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <button type="button" className="btn btn--ghost btn--block" onClick={() => setCreating(true)}>
-                <UserPlus size={16} strokeWidth={ICON_STROKE} /> Nouveau conducteur
-              </button>
-            </>
-          )}
+          <div className="driver-menu__who">
+            <span className="avatar avatar--small">{initials(driver?.name)}</span>
+            <span className="driver-list__text">
+              <strong>{driver?.name}</strong>
+              <span className="muted">Badge {driver?.badgeId}</span>
+            </span>
+          </div>
+          <Link to="/historique" role="menuitem" className="driver-menu__item" onClick={() => setOpen(false)}>
+            <History size={16} strokeWidth={ICON_STROKE} aria-hidden /> Historique et factures
+          </Link>
+          <Link to="/parametres" role="menuitem" className="driver-menu__item" onClick={() => setOpen(false)}>
+            <Settings size={16} strokeWidth={ICON_STROKE} aria-hidden /> Paramètres
+          </Link>
+          <button
+            type="button"
+            role="menuitem"
+            className="driver-menu__item"
+            onClick={() => {
+              setOpen(false)
+              selectDriver(null)
+            }}
+          >
+            <Users size={16} strokeWidth={ICON_STROKE} aria-hidden /> Changer de compte
+          </button>
         </div>
       )}
     </div>

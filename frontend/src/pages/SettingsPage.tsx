@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../api/client'
 import { DriverForm } from '../components/DriverForm'
 import { CardSkeleton, EmptyState, ErrorBanner, ICON_STROKE, PageHeader } from '../components/ui'
 import { initials } from '../lib/format'
+import { pageMeta } from '../lib/pages'
 import { useDriver } from '../state/DriverContext'
 
 /** Parametres / Profil : choix du conducteur (pas encore d'authentification) et creation. */
@@ -14,10 +15,10 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Paramètres" subtitle="Choisissez le conducteur qui utilise l’application." />
+      <PageHeader title={pageMeta('/parametres').title} subtitle={pageMeta('/parametres').subtitle} />
       <div className="two-columns">
-        <section className="card card--padded" aria-label="Conducteur">
-          <h2 className="card__title">Conducteur</h2>
+        <section className="card card--padded" aria-label="Compte de démonstration">
+          <h2 className="card__title">Compte de démonstration</h2>
           {error && (
             <ErrorBanner
               error={error}
@@ -57,9 +58,9 @@ export function SettingsPage() {
           )}
         </section>
 
-        <section className="card card--padded" aria-label="Nouveau conducteur">
+        <section className="card card--padded" aria-label="Nouveau compte">
           <h2 className="card__title">
-            <UserPlus size={20} strokeWidth={ICON_STROKE} aria-hidden /> Nouveau conducteur
+            <UserPlus size={20} strokeWidth={ICON_STROKE} aria-hidden /> Nouveau compte
           </h2>
           {creating ? (
             <DriverForm onCreated={() => setCreating(false)} onCancel={() => setCreating(false)} />
@@ -70,7 +71,7 @@ export function SettingsPage() {
               text="Le badge doit être autorisé par les bornes (TAG-001, TAG-002 ou TAG-003 dans les données de démonstration) pour pouvoir charger."
               action={
                 <button type="button" className="btn btn--ghost" onClick={() => setCreating(true)}>
-                  Créer un conducteur
+                  Créer un compte
                 </button>
               }
             />

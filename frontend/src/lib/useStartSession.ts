@@ -1,31 +1,67 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ApiError } from '../api/client'
-import { voltpark, type Reservation } from '../api/voltpark'
+import { voltpark, type Session } from '../api/voltpark'
+import { useCharge } from '../state/ChargeContext'
+import { useDriver } from '../state/DriverContext'
 
-/** Demarre la charge a partir d'une reservation (POST /sessions), puis ouvre Mes sessions. */
+/**
+ * Demarre une charge (POST /sessions), tout de suite (sans reservation) ou depuis une reservation.
+ * ACTIVE : ouvre Ma charge. PENDING_START (passerelle des bornes injoignable) : la session est
+ * renvoyee pour proposer "Reessayer" la ou l'utilisateur se trouve. Refus : `error`.
+ */
 export function useStartSession() {
   const navigate = useNavigate()
-  const [startingId, setStartingId] = useState<number | null>(null)
+  const { driver } = useDriver()
+  const { refresh } = useCharge()
+  const [busyKey, setBusyKey] = useState<string | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
+  const [pending, setPending] = useState<Session | null>(null)
 
-  async function start(reservation: Reservation) {
-    if (reservation.id == null || reservation.driverId == null || !reservation.chargerId) return
-    setStartingId(reservation.id)
+  async function start(chargerId: string, reservationId?: number): Promise<Session | null> {
+    if (driver?.id == null) return null
+    setBusyKey(reservationId != null ? `reservation-${reservationId}` : chargerId)
     setError(null)
+    setPending(null)
     try {
-      await voltpark.startSession({
-        driverId: reservation.driverId,
-        chargerId: reservation.chargerId,
-        reservationId: reservation.id,
-      })
-      navigate('/sessions')
+      const session = await voltpark.startSession({ driverId: driver.id, chargerId, reservationId })
+      await refresh()
+      if (session.status === 'PENDING_START') setPending(session)
+      else navigate('/charge')
+      return session
     } catch (e) {
       setError(e instanceof ApiError ? e : new ApiError(0, String(e)))
+      void refresh()
+      return null
     } finally {
-      setStartingId(null)
+      setBusyKey(null)
     }
   }
 
-  return { start, startingId, error }
+  /** Nouvel essai d'une session PENDING_START (POST /sessions/{id}/start-attempts). */
+  async function retry(session: Session) {
+    if (!session.id) return
+    setBusyKey(`retry-${session.id}`)
+    setError(null)
+    try {
+      const started = await voltpark.retryStart(session.id)
+      await refresh()
+      if (started.status === 'ACTIVE') {
+        setPending(null)
+        navigate('/charge')
+      }
+    } catch (e) {
+      setError(e instanceof ApiError ? e : new ApiError(0, String(e)))
+      void refresh()
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  function reset() {
+    setError(null)
+    setPending(null)
+  }
+
+  return { start, retry, reset, busyKey, busy: busyKey !== null, error, pending }
 }

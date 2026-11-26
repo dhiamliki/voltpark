@@ -8,7 +8,9 @@ import 'leaflet/dist/leaflet.css'
 import './styles/theme.css'
 import './styles/app.css'
 import './styles/pages.css'
+import './styles/journey.css'
 import { App } from './App'
+import { ChargeProvider } from './state/ChargeContext'
 import { DriverProvider } from './state/DriverContext'
 import { SearchProvider } from './state/SearchContext'
 
@@ -16,9 +18,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <DriverProvider>
-        <SearchProvider>
-          <App />
-        </SearchProvider>
+        <ChargeProvider>
+          <SearchProvider>
+            <App />
+          </SearchProvider>
+        </ChargeProvider>
       </DriverProvider>
     </BrowserRouter>
   </StrictMode>,

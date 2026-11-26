@@ -5,32 +5,41 @@ import type { ApiError } from '../api/client'
 import { useDriver } from '../state/DriverContext'
 import { Banner, CardSkeleton, EmptyState, ICON_STROKE } from './ui'
 
-/** Titre et conseil pour un refus au demarrage (403 badge refuse, 409 borne occupee...). */
-export function startErrorTitle(error: ApiError): { title: string; hint?: string; replaceMessage?: boolean } {
+export type StartErrorKind = 'badge' | 'charger' | 'gateway' | 'other'
+
+/** Titre, conseil et type de refus au demarrage (403 badge refuse, 409 borne occupee ou reservee...). */
+export function startErrorTitle(error: ApiError): { title: string; hint?: string; replaceMessage?: boolean; kind: StartErrorKind } {
   if (error.status === 403 || error.errorCode === 'BADGE_REFUSED') {
-    return { title: 'Badge refusé', hint: 'Ce badge n’est pas autorisé sur les bornes. Choisissez un autre conducteur dans Paramètres.' }
+    return { kind: 'badge', title: 'Badge refusé', hint: 'Ce badge n’est pas autorisé sur les bornes. Changez de compte pour charger.' }
   }
   if (error.errorCode === 'CHARGER_OCCUPIED') {
-    return { title: 'Borne occupée', hint: 'Choisissez une autre borne ou réessayez dans quelques minutes.' }
+    return { kind: 'charger', title: 'Borne occupée', hint: 'Choisissez une autre borne de la station, ou une autre station.' }
+  }
+  if (error.errorCode === 'CHARGER_RESERVED') {
+    return { kind: 'charger', title: 'Borne réservée', hint: 'Choisissez une autre borne, ou réservez un créneau plus tard.' }
+  }
+  if (error.errorCode === 'CHARGER_OUT_OF_SERVICE') {
+    return { kind: 'charger', title: 'Borne hors service', hint: 'Choisissez une autre borne de la station.' }
   }
   if (error.status === 409) {
-    return { title: 'Démarrage impossible' }
+    return { kind: 'other', title: 'Démarrage impossible' }
   }
   if (error.status === 502 || error.status === 503) {
     return {
+      kind: 'gateway',
       title: 'Passerelle des bornes injoignable',
       hint: 'La session reste en attente. Réessayez dans un instant.',
       replaceMessage: true,
     }
   }
-  return { title: 'Le démarrage a échoué' }
+  return { kind: 'other', title: 'Le démarrage a échoué' }
 }
 
-export function StartErrorBanner({ error }: { error: ApiError | null }) {
+export function StartErrorBanner({ error, actions }: { error: ApiError | null; actions?: ReactNode }) {
   if (!error) return null
   const { title, hint, replaceMessage } = startErrorTitle(error)
   return (
-    <Banner tone="danger" title={title} requestId={error.requestId}>
+    <Banner tone="danger" title={title} requestId={error.requestId} actions={actions}>
       {replaceMessage ? hint : error.message}
       {hint && !replaceMessage && <> {hint}</>}
     </Banner>
@@ -53,11 +62,11 @@ export function RequireDriver({ children }: { children: (driverId: number) => Re
       <div className="card">
         <EmptyState
           icon={<UserRound size={24} strokeWidth={ICON_STROKE} />}
-          title="Choisissez un conducteur"
-          text="Sélectionnez votre profil ou créez-en un pour voir vos réservations, sessions et factures."
+          title="Choisissez un compte"
+          text="Choisissez un compte de démonstration pour charger, réserver et voir vos factures."
           action={
-            <Link to="/parametres" className="btn btn--primary">
-              Choisir un conducteur
+            <Link to="/" className="btn btn--primary">
+              Choisir un compte
             </Link>
           }
         />

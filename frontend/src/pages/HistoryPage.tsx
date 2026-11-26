@@ -1,68 +1,22 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
-import { CalendarClock, ChevronLeft, ChevronRight, Clock3, History, Play, Zap } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router'
+import { CalendarClock, ChevronLeft, ChevronRight, Clock3, FileText, History, Zap } from 'lucide-react'
 import { voltpark, type Invoice, type Session } from '../api/voltpark'
-import { LiveSessionPanel } from '../components/LiveSessionPanel'
-import { PendingSessionPanel } from '../components/PendingSessionPanel'
-import { RequireDriver, StartErrorBanner } from '../components/sessionParts'
+import { RequireDriver } from '../components/sessionParts'
 import { CardSkeleton, ErrorBanner, ICON_STROKE, Metric, MetricStrip, PageHeader, Pill } from '../components/ui'
 import { formatDateTime, formatDuration, formatKwh, formatMoney } from '../lib/format'
+import { pageMeta } from '../lib/pages'
 import { durationSeconds, isFinished, latestFinished, monthSummary } from '../lib/stats'
 import { SESSION_LABELS, sessionTone } from '../lib/status'
 import { useLoad } from '../lib/useLoad'
-import { useStartSession } from '../lib/useStartSession'
+import { InvoicesTab } from './InvoicesPage'
 
 const PAGE_SIZE = 8
 
+type Tab = 'charges' | 'factures'
+
 function byStartDesc(a: Session, b: Session) {
   return (b.startedAt ?? '').localeCompare(a.startedAt ?? '')
-}
-
-/** Aucune session en cours : demarrer depuis une reservation confirmee. */
-function StartFromReservation({ driverId }: { driverId: number }) {
-  const { data: reservations } = useLoad(() => voltpark.reservations(driverId), `reservations-${driverId}`)
-  const { start, startingId, error } = useStartSession()
-  const confirmed = (reservations ?? []).filter((r) => r.status === 'CONFIRMED')
-
-  return (
-    <section className="card card--padded">
-      <StartErrorBanner error={error} />
-      {confirmed.length === 0 ? (
-        <div className="idle">
-          <span className="idle__icon">
-            <Zap size={20} strokeWidth={ICON_STROKE} aria-hidden />
-          </span>
-          <div className="idle__text">
-            <p className="idle__title">Aucune charge en cours</p>
-            <p className="muted">Réservez une borne, puis démarrez la charge à votre arrivée.</p>
-          </div>
-          <Link to="/reservations" className="btn btn--primary btn--small">
-            Réserver une borne
-          </Link>
-        </div>
-      ) : (
-        <>
-          <h2 className="card__title">
-            <Play size={20} strokeWidth={ICON_STROKE} aria-hidden /> Démarrer une charge
-          </h2>
-          <ul className="rows">
-            {confirmed.map((r) => (
-              <li key={r.id} className="row">
-                <div className="row__main">
-                  <strong>{r.chargerId}</strong>
-                  <span className="muted tabular">Réservée à partir de {formatDateTime(r.startTime)}</span>
-                </div>
-                <button type="button" className="btn btn--primary btn--small" onClick={() => start(r)} disabled={startingId !== null}>
-                  <Play size={14} strokeWidth={ICON_STROKE} fill="currentColor" aria-hidden />
-                  {startingId === r.id ? 'Démarrage…' : 'Démarrer la charge'}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </section>
-  )
 }
 
 function SessionHistory({ sessions, invoices }: { sessions: Session[]; invoices: Invoice[] }) {
@@ -74,13 +28,13 @@ function SessionHistory({ sessions, invoices }: { sessions: Session[]; invoices:
   const invoiceOf = (sessionId?: string) => invoices.find((i) => i.sessionId === sessionId)
 
   return (
-    <section className="card card--padded" aria-label="Historique des sessions">
+    <section className="card card--padded" aria-label="Historique des charges">
       <h2 className="card__title">
-        <History size={20} strokeWidth={ICON_STROKE} aria-hidden /> Historique
-        <span className="muted card__count tabular">{sessions.length} session{sessions.length > 1 ? 's' : ''}</span>
+        <History size={20} strokeWidth={ICON_STROKE} aria-hidden /> Charges passées
+        <span className="muted card__count tabular">{sessions.length} charge{sessions.length > 1 ? 's' : ''}</span>
       </h2>
       {sessions.length === 0 ? (
-        <p className="muted">Vos sessions terminées apparaîtront ici.</p>
+        <p className="muted">Vos charges terminées apparaîtront ici.</p>
       ) : (
         <>
           <div className="table-wrap">
@@ -150,7 +104,7 @@ function SessionsSummary({ sessions, invoices }: { sessions: Session[]; invoices
   const last = latestFinished(sessions)
   return (
     <MetricStrip>
-      <Metric icon={<Zap size={16} strokeWidth={ICON_STROKE} />} label="Sessions ce mois" value={month.sessions} hint={`${finished.length} au total`} />
+      <Metric icon={<Zap size={16} strokeWidth={ICON_STROKE} />} label="Charges ce mois" value={month.sessions} hint={`${finished.length} au total`} />
       <Metric icon={<Zap size={16} strokeWidth={ICON_STROKE} />} label="Énergie ce mois" value={formatKwh(month.energyKwh)} unit="kWh" />
       <Metric icon={<Clock3 size={16} strokeWidth={ICON_STROKE} />} label="Durée moyenne" value={formatDuration(average)} hint="par session" />
       <Metric icon={<CalendarClock size={16} strokeWidth={ICON_STROKE} />} label="Dernière charge" value={last ? formatDateTime(last.startedAt) : '—'} hint={last ? `${formatKwh(last.totalEnergyKwh)} kWh · borne ${last.chargerId}` : undefined} />
@@ -158,7 +112,7 @@ function SessionsSummary({ sessions, invoices }: { sessions: Session[]; invoices
   )
 }
 
-function SessionsContent({ driverId }: { driverId: number }) {
+function ChargesTab({ driverId }: { driverId: number }) {
   const sessions = useLoad(() => voltpark.sessions(driverId), `sessions-${driverId}`)
   const invoices = useLoad(() => voltpark.invoices(driverId), `invoices-${driverId}`)
 
@@ -166,7 +120,7 @@ function SessionsContent({ driverId }: { driverId: number }) {
     return (
       <ErrorBanner
         error={sessions.error}
-        title="Impossible de charger vos sessions"
+        title="Impossible de charger vos charges"
         actions={<button type="button" className="btn btn--ghost btn--small" onClick={sessions.reload}>Réessayer</button>}
       />
     )
@@ -179,32 +133,50 @@ function SessionsContent({ driverId }: { driverId: number }) {
       </div>
     )
   }
-
   const sorted = [...sessions.data].sort(byStartDesc)
-  const active = sorted.find((s) => s.status === 'ACTIVE')
-  const pending = sorted.find((s) => s.status === 'PENDING_START')
   const past = sorted.filter((s) => s.status !== 'ACTIVE' && s.status !== 'PENDING_START')
-  const refresh = () => {
-    sessions.reload()
-    invoices.reload()
-  }
-
   return (
     <div className="stack">
       <SessionsSummary sessions={sorted} invoices={invoices.data ?? []} />
-      {active && <LiveSessionPanel session={active} />}
-      {pending && <PendingSessionPanel session={pending} onChange={refresh} />}
-      {!active && !pending && <StartFromReservation driverId={driverId} />}
       <SessionHistory sessions={past} invoices={invoices.data ?? []} />
     </div>
   )
 }
 
-export function SessionsPage() {
+const TABS: Array<{ id: Tab; label: string; icon: typeof History }> = [
+  { id: 'charges', label: 'Charges', icon: History },
+  { id: 'factures', label: 'Factures', icon: FileText },
+]
+
+/** Historique et factures : les charges passees et leurs factures, dans deux onglets. */
+export function HistoryPage() {
+  const [params, setParams] = useSearchParams()
+  const tab: Tab = params.get('onglet') === 'factures' ? 'factures' : 'charges'
+  const meta = pageMeta('/historique')
   return (
     <>
-      <PageHeader title="Mes sessions" subtitle="Suivez votre charge en direct et retrouvez vos sessions passées." />
-      <RequireDriver>{(driverId) => <SessionsContent driverId={driverId} />}</RequireDriver>
+      <PageHeader title={meta.title} subtitle={meta.subtitle} />
+      <div className="tabs" role="tablist" aria-label="Historique et factures">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            id={`tab-${id}`}
+            aria-selected={tab === id}
+            aria-controls={`panel-${id}`}
+            className={`tabs__tab ${tab === id ? 'is-active' : ''}`}
+            onClick={() => setParams(id === 'charges' ? {} : { onglet: id }, { replace: true })}
+          >
+            <Icon size={16} strokeWidth={ICON_STROKE} aria-hidden /> {label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+        <RequireDriver>
+          {(driverId) => (tab === 'factures' ? <InvoicesTab driverId={driverId} /> : <ChargesTab driverId={driverId} />)}
+        </RequireDriver>
+      </div>
     </>
   )
 }

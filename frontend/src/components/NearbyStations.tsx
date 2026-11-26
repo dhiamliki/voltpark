@@ -45,7 +45,7 @@ export function NearbyStations({ stations, selectedId, userPosition, onSelect }:
                 <strong>{shortName(station.name)}</strong>
                 <span className="muted">
                   {distance != null && <span className="tabular">{distance.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km · </span>}
-                  {cityOf(station.address)} · <span className="tabular">{formatKw(maxPower(station))} kW max</span>
+                  <bdi>{cityOf(station.address)}</bdi> · <span className="tabular">{formatKw(maxPower(station))} kW max</span>
                 </span>
               </span>
               <Pill tone={counts.available > 0 ? 'success' : 'neutral'}>

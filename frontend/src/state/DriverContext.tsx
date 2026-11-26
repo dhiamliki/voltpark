@@ -6,12 +6,14 @@ import { readStorage, writeStorage } from '../lib/storage'
 const STORAGE_KEY = 'voltpark.driverId'
 
 /**
- * Conducteur courant. Il n'y a pas encore d'authentification : le conducteur est choisi
- * dans le menu de l'avatar (ou Parametres) et retenu dans localStorage.
+ * Conducteur courant. Il n'y a pas encore d'authentification : le compte est choisi sur l'ecran
+ * d'accueil (ou "Changer de compte" dans le menu de l'avatar) et retenu dans localStorage.
  */
 interface DriverState {
   drivers: Driver[]
   driver: Driver | null
+  /** compte choisi (retenu dans localStorage), meme si la liste des conducteurs charge encore */
+  selectedId: number | null
   loading: boolean
   error: ApiError | null
   selectDriver: (id: number | null) => void
@@ -49,6 +51,15 @@ export function DriverProvider({ children }: { children: ReactNode }) {
     }
   }, [version])
 
+  // un autre onglet change de compte : celui-ci suit
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === STORAGE_KEY) setDriverId(storedDriverId())
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
   const selectDriver = useCallback((id: number | null) => {
     setDriverId(id)
     writeStorage(STORAGE_KEY, id === null ? null : String(id))
@@ -68,6 +79,7 @@ export function DriverProvider({ children }: { children: ReactNode }) {
     () => ({
       drivers,
       driver: drivers.find((d) => d.id === driverId) ?? null,
+      selectedId: driverId,
       loading,
       error,
       selectDriver,

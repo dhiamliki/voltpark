@@ -53,7 +53,7 @@ export function NotificationBell() {
             <ul className="bell__list">
               {pendingStarts.map((s) => (
                 <li key={s.id}>
-                  <Link to="/sessions" className="bell__item" onClick={() => setOpen(false)}>
+                  <Link to="/charge" className="bell__item" onClick={() => setOpen(false)}>
                     <Hourglass size={18} strokeWidth={ICON_STROKE} aria-hidden />
                     <span>
                       <strong>Démarrage en attente</strong>
