@@ -145,16 +145,16 @@ docker run --rm -v "$PWD/api-gateway:/app" -w /app maven:3.9-eclipse-temurin-17 
 
 Application web du conducteur (`frontend/`) : React 19, TypeScript, Vite, React Router, carte Leaflet (react-leaflet) et icônes lucide-react. Elle n'appelle que l'API Gateway.
 
-![Carte et session en direct](docs/screenshots/carte.png)
+![Tableau de bord : carte, station et vue d’ensemble](docs/screenshots/carte.png)
 
 **Pages**
 
 | Page | Rôle |
 |---|---|
-| Carte (`/`) | Carte OpenStreetMap avec une épingle par station (épingle sélectionnée en vert sauge) et sa bulle « Nom · X disponibles », bouton de localisation, fiche de la station (bornes totales, disponibles, occupées, liste des bornes, « Réserver une borne ») et, en dessous, la session en cours. Le champ « Rechercher une station… » filtre les stations. |
-| Réservations | Choix de la station, de la borne et du créneau ; les erreurs de validation de l'API s'affichent sous chaque champ. Liste des réservations à venir avec « Démarrer la charge » (`POST /sessions`) et « Annuler » (`DELETE`, 204). |
-| Mes sessions | Session en direct : anneau de batterie et temps restant, puissance, énergie, durée, « Arrêter la charge » (`PATCH /sessions/{id}` `{"status":"STOPPED"}`, puis ouverture de la facture) et graphique de puissance des 120 dernières mesures. Session `PENDING_START` : « Réessayer le démarrage » (`POST /sessions/{id}/start-attempts`) ou « Annuler ». Historique paginé avec lien vers chaque facture. |
-| Factures | Liste et détail (kWh heures pleines / creuses, prix, frais d'occupation, total). Facture `PENDING_ENERGY` : « Recalculer ». |
+| Carte (`/`) | Tableau de bord plein écran. Carte de toutes les stations (épingles avec le nombre de bornes disponibles, sélection en vert sauge, bulle « Nom · X/Y disponibles », légende, localisation et zoom). À droite : fiche de la station (tarifs heures pleines / creuses, puissance max, bornes avec connecteur et statut, « Réserver une borne ») et stations à proximité. En bas : la session en direct, ou une vue d’ensemble (énergie, dépenses, sessions et CO₂ évité du mois, énergie des 7 derniers jours, dernière session, démarrage depuis la prochaine réservation). Le champ « Rechercher une station… » filtre les stations ; la cloche signale les démarrages et factures en attente. |
+| Réservations | Indicateurs (à venir, en cours, terminées, annulées), choix de la station, de la borne et du créneau ; les erreurs de validation de l'API s'affichent sous chaque champ. Tableau des réservations avec « Démarrer la charge » (`POST /sessions`) et « Annuler » (`DELETE`, 204). |
+| Mes sessions | Session en direct : anneau de batterie et temps restant, puissance, énergie, durée, « Arrêter la charge » (`PATCH /sessions/{id}` `{"status":"STOPPED"}`, puis ouverture de la facture) et graphique de puissance des 120 dernières mesures. Session `PENDING_START` : « Réessayer le démarrage » (`POST /sessions/{id}/start-attempts`) ou « Annuler ». Indicateurs du mois et historique paginé (tableau avec durée, énergie, statut, montant, facture). |
+| Factures | Indicateurs (dépenses du mois, payées, à régler, énergie), tableau des factures et détail (kWh heures pleines / creuses, prix, frais d'occupation, total, session facturée). Facture `PENDING_ENERGY` : « Recalculer ». |
 | Paramètres (Profil sur mobile) | Choix ou création du conducteur. Il n'y a pas encore d'authentification : le conducteur choisi est retenu dans le navigateur (localStorage). |
 
 Sur téléphone (moins de 768 px), la barre latérale est remplacée par un en-tête (logo et menu) et une barre d'onglets en bas : Carte, Sessions, Factures, Profil.
@@ -177,9 +177,11 @@ VITE_API_BASE_URL=http://localhost:8080/api/v1 npm run dev     # http://localhos
 
 **Autres commandes** : `npm test` (Vitest + Testing Library), `npm run build`, `npm run gen:api` (régénère `src/api/schema.d.ts` à partir de `openapi.yaml` de session-service avec openapi-typescript ; le générateur a besoin de l'API de TypeScript 5, il est donc lancé avec `npx` dans un environnement séparé, le projet restant en TypeScript 7).
 
-**Fonds de carte.** Les tuiles viennent des serveurs OpenStreetMap (attribution affichée en bas de la carte) et demandent un accès à Internet ; les noms de lieux sont ceux d'OpenStreetMap (en arabe et en français à Tunis). Sans accès aux tuiles, la page affiche à la place la liste des stations.
+**Fonds de carte.** Fond clair Esri World Light Gray Canvas (attribution affichée en bas de la carte), sans clé d'API ; CARTO Positron demande désormais une clé. Une autre source peut être choisie au build avec `VITE_MAP_TILES_URL` et `VITE_MAP_TILES_ATTRIBUTION`. Les tuiles demandent un accès à Internet : sans elles, la page affiche la liste des stations. Les épingles trop proches à un niveau de zoom sont écartées en cercle (chaque station garde son épingle).
 
-**Captures d'écran** (`docs/screenshots/`) : `carte.png`, `reservation.png`, `session-live.png`, `facture.png`, `pending-start.png`, `mobile.png`, `mobile-session.png`.
+**Données de démonstration.** Au premier démarrage (bases vides), session-service et charger-gateway-service créent 10 stations (Grand Tunis, Sousse, Sfax, Nabeul, Hammamet) et 35 bornes avec les mêmes identifiants, 4 conducteurs (`TAG-BLOCKED` est refusé par les bornes), des sessions et factures sur les 7 derniers jours et quelques réservations. Pour repartir de ces données : `docker compose down -v`.
+
+**Captures d'écran** (`docs/screenshots/`) : tableau de bord sans session (`carte.png` en 1920 × 1080, `carte-1440.png`, `carte-mobile.png`) et avec une session en direct (`carte-live.png`, `carte-live-1440.png`, `carte-live-mobile.png`, `mobile-session.png`), `session-live.png`, `sessions.png`, `reservation.png`, `factures.png`, `facture.png`, `pending-start.png`.
 
 ## Répartition des tâches
 
